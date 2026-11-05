@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AG Systems Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: package -> system map on top, then one swimlane per system where steps flow left to right. Green = automated, orange = manual, split = AI + human check. */
+:root {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #eceef3;
+  --ink: #12141a;
+  --muted: #5d6372;
+  --line: #d9dce4;
+  --accent: #2b47e6;
+  --auto: #129b4d;
+  --auto-soft: #e3f5ea;
+  --manual: #e2700f;
+  --manual-soft: #fdeedf;
+  --pk-visible: #2f7fe0;
+  --pk-authority: #7a4de8;
+  --pk-growth: #c2367a;
+  --shadow: 0 1px 2px rgba(18,20,26,.06), 0 6px 18px rgba(18,20,26,.06);
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1116; --surface: #181b22; --surface-2: #20242d; --ink: #eef0f5; --muted: #9aa1b2; --line: #2c313c;
+    --accent: #8195ff; --auto: #2fc56f; --auto-soft: #143323; --manual: #ff9440; --manual-soft: #3a2513;
+    --pk-visible: #5aa0f5; --pk-authority: #a184ff; --pk-growth: #ec6aa6;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1116; --surface: #181b22; --surface-2: #20242d; --ink: #eef0f5; --muted: #9aa1b2; --line: #2c313c;
+  --accent: #8195ff; --auto: #2fc56f; --auto-soft: #143323; --manual: #ff9440; --manual-soft: #3a2513;
+  --pk-visible: #5aa0f5; --pk-authority: #a184ff; --pk-growth: #ec6aa6;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.wrap { max-width: 1440px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } }
+
+/* Top bar */
+.top { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 16px; padding-top: 12px; padding-bottom: 12px; flex-wrap: wrap; }
+.brand { display: flex; flex-direction: column; margin-right: auto; }
+.brand small { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.brand h1 { font-size: 22px; font-weight: 800; }
+.ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.select { appearance: none; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' fill='none' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center; border: 1px solid var(--line); border-radius: 10px; padding: 8px 32px 8px 12px; font-weight: 600; min-width: 190px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.danger { color: #d13b3b; }
+.btn.danger.armed { background: #d13b3b; color: #fff; border-color: #d13b3b; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.status { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.status[data-s="saved"]::before { background: var(--auto); }
+.status[data-s="saving"]::before { background: var(--accent); }
+.status[data-s="warn"]::before { background: var(--manual); }
+
+/* Summary */
+.summary { display: grid; grid-template-columns: 1.2fr 2fr; gap: 16px; margin: 20px 0 8px; }
+@media (max-width: 900px) { .summary { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; }
+.ctx h2 { font-size: 26px; font-weight: 800; }
+.ctx p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.ctx .tag { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 600px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { border-radius: 12px; padding: 10px 12px; border: 1px solid var(--line); text-align: left; background: var(--surface); }
+.stat b { display: block; font-family: var(--font-display); font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stat span { font-size: 13px; color: var(--muted); }
+button.stat:hover { border-color: var(--muted); }
+.stat.on { outline: 2px solid var(--ink); outline-offset: -1px; }
+.stat.auto b { color: var(--auto); } .stat.manual b { color: var(--manual); }
+.stat.hybrid b { background: linear-gradient(90deg, var(--auto), var(--manual)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.people { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+.people .lbl { font-size: 12px; color: var(--muted); margin-right: 4px; }
+.pchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); padding: 3px 10px 3px 3px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+.pchip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; flex: none; }
+
+/* Package -> system map */
+.mapcard { margin: 16px 0 8px; padding: 18px 18px 6px; }
+.maphead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.maphead h2 { font-size: 18px; }
+.maphead p { margin: 0; color: var(--muted); font-size: 13px; }
+.mapscroll { overflow-x: auto; }
+.map { position: relative; min-width: 940px; padding: 18px 0 150px; }
+.map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.pkrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; max-width: 820px; margin: 0 auto 92px; }
+.pk { position: relative; z-index: 1; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-top: 5px solid var(--pc); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); }
+.pk:hover { border-color: var(--pc); }
+.pk.on { outline: 2px solid var(--pc); outline-offset: 2px; }
+.pk.dim { opacity: .4; }
+.pk h3 { font-size: 18px; color: var(--pc); }
+.pk .price { font-weight: 700; font-size: 13px; }
+.pk p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.pk .edit { position: absolute; top: 8px; right: 8px; border: 0; background: transparent; color: var(--muted); padding: 4px; border-radius: 6px; }
+.pk .edit:hover { background: var(--surface-2); color: var(--ink); }
+.sysrow { display: grid; grid-template-columns: repeat(var(--n, 6), 1fr); gap: 14px; }
+.sn { position: relative; z-index: 1; text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); }
+.sn:hover { border-color: var(--ink); }
+.sn.dim { opacity: .35; }
+.sn .code { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.sn h3 { font-size: 14.5px; margin: 2px 0 8px; line-height: 1.2; }
+.minibar { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--surface-2); }
+.minibar i { display: block; height: 100%; }
+.minibar .a { background: var(--auto); } .minibar .h { background: linear-gradient(90deg, var(--auto), var(--manual)); } .minibar .m { background: var(--manual); }
+.sn .meta { font-size: 11.5px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.dots { display: flex; gap: 3px; margin-top: 6px; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-2); }
+.lnk { fill: none; stroke-width: 2; opacity: .55; transition: opacity .15s; }
+.lnk.dim { opacity: .08; }
+.lnk.hot { opacity: 1; stroke-width: 2.6; }
+.flow { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .5; }
+.flow.hot { stroke: var(--ink); opacity: 1; stroke-dasharray: none; stroke-width: 2; }
+.flowlbl { font-size: 11px; font-weight: 700; fill: var(--ink); opacity: 0; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
+.flowlbl.hot { opacity: 1; }
+
+/* Lanes */
+.lanes { display: flex; flex-direction: column; gap: 18px; margin: 18px 0 60px; }
+.lane { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); scroll-margin-top: 90px; transition: opacity .15s; }
+.lane.dim { opacity: .45; }
+.lane.collapsed .stage { display: none; }
+.lanehead { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.syscode { font-family: var(--font-display); font-weight: 800; font-size: 20px; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--ink); color: var(--bg); flex: none; }
+.lanetitle { display: flex; flex-direction: column; min-width: 220px; flex: 1; }
+.lanetitle button { all: unset; cursor: pointer; font-family: var(--font-display); font-weight: 800; font-size: 19px; }
+.lanetitle button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.lanetitle button:focus-visible { outline: 2px solid var(--accent); }
+.lanetitle span { color: var(--muted); font-size: 13.5px; }
+.chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--surface-2); white-space: nowrap; }
+.pkdots { display: flex; gap: 4px; }
+.pkdots span { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; }
+.pkdots span.off { background: transparent !important; color: var(--muted); border: 1px dashed var(--line); text-decoration: line-through; }
+.lanebar { width: 230px; }
+.lanebar .minibar { height: 8px; }
+.lanebar small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.notin { font-size: 12px; font-weight: 700; color: var(--muted); border: 1px dashed var(--line); padding: 3px 10px; border-radius: 99px; }
+.stage { padding: 12px 0 6px; }
+.stage + .stage { border-top: 1px dashed var(--line); }
+.stagehead { display: flex; align-items: center; gap: 10px; padding: 0 18px 6px; }
+.stagehead .letter { font-family: var(--font-mono); font-size: 11px; font-weight: 500; background: var(--surface-2); padding: 2px 7px; border-radius: 6px; }
+.stagehead b { font-size: 14px; }
+.stagehead span { font-size: 12.5px; color: var(--muted); }
+.track { display: flex; align-items: stretch; overflow-x: auto; padding: 8px 18px 16px; scrollbar-width: thin; }
+.conn { flex: none; width: 34px; display: grid; place-items: center; color: var(--muted); }
+.conn svg { width: 34px; height: 12px; }
+
+.card { flex: none; width: 214px; position: relative; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 11px 12px 10px 16px; display: flex; flex-direction: column; gap: 6px; transition: transform .12s, box-shadow .12s, opacity .15s; overflow: hidden; }
+.card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--mc); }
+.card.auto { --mc: var(--auto); background: linear-gradient(180deg, var(--auto-soft), var(--surface) 70%); }
+.card.manual { --mc: var(--manual); background: linear-gradient(180deg, var(--manual-soft), var(--surface) 70%); }
+.card.hybrid { --mc: linear-gradient(180deg, var(--auto) 0 50%, var(--manual) 50% 100%); background: linear-gradient(135deg, var(--auto-soft), var(--surface) 45%, var(--surface) 60%, var(--manual-soft)); }
+.card.hybrid::before { background: linear-gradient(180deg, var(--auto) 0 50%, var(--manual) 50% 100%); }
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--muted); }
+.card.sel { outline: 2.5px solid var(--ink); outline-offset: 1px; }
+.card.dim { opacity: .22; }
+.card .row1 { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.card .num { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.mpill { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 99px; color: #fff; }
+.mpill.auto { background: var(--auto); } .mpill.manual { background: var(--manual); }
+.mpill.hybrid { background: linear-gradient(90deg, var(--auto), var(--manual)); }
+.card .t { font-weight: 700; font-size: 14.5px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card .who { margin-top: auto; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.who .tool, .who .own { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.who .tool span, .who .own span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .tool { font-weight: 700; color: var(--auto); }
+.who .tool svg { flex: none; }
+.who .own { color: var(--muted); font-weight: 600; }
+.card.manual .who .own { color: var(--ink); }
+.who .av { width: 18px; height: 18px; font-size: 9px; }
+.feedtag { font-size: 10.5px; font-weight: 700; color: var(--accent); }
+.addcard { flex: none; width: 140px; border: 1.5px dashed var(--line); border-radius: 13px; background: transparent; color: var(--muted); font-weight: 700; display: grid; place-items: center; margin-left: 12px; min-height: 120px; }
+.addcard:hover { border-color: var(--ink); color: var(--ink); }
+.addsys { align-self: flex-start; }
+
+/* Tooltip */
+#tip { position: fixed; z-index: 60; max-width: 280px; background: var(--ink); color: var(--bg); padding: 10px 12px; border-radius: 10px; font-size: 13px; pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+#tip.on { opacity: 1; transform: none; }
+#tip b { display: block; margin-bottom: 2px; }
+#tip small { display: block; margin-top: 6px; opacity: .65; }
+
+/* Drawer */
+.scrim { position: fixed; inset: 0; background: rgba(10,12,18,.28); opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 40; }
+.scrim.on { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 50; transform: translateX(102%); transition: transform .22s ease; display: flex; flex-direction: column; }
+.drawer.on { transform: none; }
+.dhead { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: flex-start; }
+.dhead .x { margin-left: auto; border: 0; background: var(--surface-2); border-radius: 8px; width: 32px; height: 32px; font-size: 18px; flex: none; }
+.dhead h2 { font-size: 20px; }
+.dhead small { font-family: var(--font-mono); color: var(--muted); font-size: 11.5px; }
+.dbody { padding: 16px 18px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > label, .field > .lab { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.inp { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; width: 100%; }
+.inp:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+textarea.inp { min-height: 110px; resize: vertical; line-height: 1.5; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg button { border: 1.5px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 6px; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.seg button i { width: 10px; height: 10px; border-radius: 50%; }
+.seg button.on.auto { border-color: var(--auto); background: var(--auto-soft); }
+.seg button.on.hybrid { border-color: var(--ink); }
+.seg button.on.manual { border-color: var(--manual); background: var(--manual-soft); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.feeds { display: flex; flex-wrap: wrap; gap: 6px; }
+.feed { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 4px 3px 10px; font-size: 12.5px; font-weight: 600; background: var(--bg); }
+.feed button { border: 0; background: transparent; padding: 0 4px; color: var(--muted); font-size: 15px; line-height: 1; }
+.feed .go { font-weight: 700; color: var(--accent); padding: 0; font-size: 12.5px; }
+.runbox { border: 1px dashed var(--line); border-radius: 12px; padding: 12px; display: flex; gap: 10px; align-items: center; }
+.runbox .btn { flex: none; white-space: nowrap; }
+.runbox p { margin: 0; font-size: 12.5px; color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.checks { display: flex; flex-direction: column; gap: 6px; }
+.checks label { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.stagerow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; }
+.empty { text-align: center; padding: 50px 20px; }
+
+/* Monthly retainer maps: dates, calendar sync, done checks */
+.cardwrap { position: relative; flex: none; display: flex; }
+.cardwrap.has-check .who { padding-right: 30px; }
+.check { position: absolute; right: 9px; bottom: 9px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); display: grid; place-items: center; color: transparent; padding: 0; z-index: 2; }
+.check:hover { border-color: var(--auto); color: var(--auto); }
+.check.on { background: var(--auto); border-color: var(--auto); color: #fff; }
+.card.done { filter: grayscale(1); opacity: .62; background: var(--surface-2) !important; }
+.card.done::before { background: var(--line) !important; }
+.card.done .t { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.datebox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.datebox label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.datebox input { width: auto; padding: 6px 9px; font-weight: 600; }
+.calst { font-size: 12.5px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.calst a { color: var(--accent); font-weight: 700; text-decoration: none; }
+.calst a:hover { text-decoration: underline; }
+.calst.ok::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--auto); }
+.calst.err { color: #d13b3b; }
+.calst button { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 8px; padding: 2px 8px; font-weight: 700; font-size: 12px; }
+.prog { margin-top: 12px; }
+.prog .minibar { height: 10px; }
+.prog .minibar .d { background: var(--auto); }
+.prog small { display: block; margin-top: 5px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.donechip { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: var(--auto-soft); color: var(--auto); white-space: nowrap; }
+.sn .date { font-size: 11.5px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><small>AG Marketing · operating system</small><h1>Systems Map</h1></div>
+    <div class="ctrl">
+      <label for="mapSel" class="note">Map</label>
+      <select id="mapSel" class="select" aria-label="Choose a map"></select>
+      <button class="btn" id="mapSettings" type="button">Map settings</button>
+      <button class="btn primary" id="newMap" type="button">+ New monthly map</button>
+      <button class="btn" id="undoBtn" type="button" title="Undo (Ctrl/Cmd+Z)" disabled>Undo</button>
+      <span class="status" id="status" data-s="">Loading…</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="summary">
+    <div class="panel ctx" id="ctx"></div>
+    <div class="panel">
+      <div class="stats" id="stats"></div>
+      <div class="people" id="people"></div>
+    </div>
+  </section>
+
+  <section class="panel mapcard" aria-label="Packages and systems map">
+    <div class="maphead">
+      <h2>Packages → systems</h2>
+      <p>Click a package to focus it. Hover a system to see how work moves between systems. Click a system to jump to it.</p>
+    </div>
+    <div class="mapscroll"><div class="map" id="map"></div></div>
+  </section>
+
+  <main class="lanes" id="lanes"></main>
+</div>
+
+<div id="tip" role="tooltip"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Details" aria-hidden="true"></aside>
+<datalist id="toolList"></datalist>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const DEFAULT = {"name": "Template", "kind": "template", "package": null, "rev": 1, "people": [{"id": "andres", "name": "Andres", "role": "Sales, strategy, growth"}, {"id": "esteban", "name": "Esteban", "role": "Client comms, shooting, ops"}, {"id": "isabella", "name": "Isabella", "role": "PM, planning, QC"}, {"id": "shooter", "name": "Shooter", "role": "On-site capture"}, {"id": "editor", "name": "Editor", "role": "Video edits"}, {"id": "setter", "name": "Setter", "role": "Calls and books leads"}, {"id": "client", "name": "Client", "role": "Approvals, outcomes"}], "packages": [{"id": "visible", "name": "Visible", "price": "$1,500/mo", "blurb": "~6 reels + 6 posts, social management, booking page, review texts.", "systems": ["sys1", "sys2", "sys3"]}, {"id": "authority", "name": "Authority", "price": "$2,500/mo", "blurb": "10 reels, 8 posts, daily stories, local boosting of top content.", "systems": ["sys1", "sys2", "sys3", "sys4"]}, {"id": "growth", "name": "Growth", "price": "$3,500/mo + $125/appt", "blurb": "Authority + 10 ads, testing, appointment setting, 15-day reports.", "systems": ["sys1", "sys2", "sys3", "sys4", "sys5", "sys6"]}], "systems": [{"id": "sys1", "code": "1", "name": "Content & strategy", "short": "From data to approved, ready-to-post content.", "cadence": "Monthly rolling cycle", "stages": [{"id": "st1a", "name": "Strategy & ideas", "when": "Week 4 of M-2", "steps": [{"id": "s-perf", "title": "Pull last month's performance", "short": "Top and bottom posts, hold rate, saves, leads per retainer.", "detail": "On the 1st, a scheduled Claude task reads Metricool and Notion, then writes a Performance Report page on each retainer: top 3 and bottom 3 posts, 3-second hold, saves, shares, profile visits and leads. Isabella reviews it. This runs first because every later step depends on it.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task + Metricool + Notion", "when": "1st of each month", "feeds": ["s-strategy"]}, {"id": "s-industry", "title": "Industry and competitor scan", "short": "What's going viral in the niche and where competitors are weak.", "detail": "A monthly scheduled run looks at competitors and viral content in the retainer's industry, scores outliers, and lists strengths and weaknesses next to the retainer's own results. Output is saved to the retainer page.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task (web search) or Muse", "when": "Monthly, week 4", "feeds": ["s-strategy"]}, {"id": "s-persona", "title": "Persona and pain points", "short": "Who buys, what hurts, which words they use.", "detail": "Research the target persona, pain points, objections and the exact words customers use. Sources: the client's Google reviews, competitor reviews, Reddit, and Esteban's call notes. Done at onboarding, then refreshed quarterly. Andres approves.", "mode": "hybrid", "owner": "isabella", "tool": "Claude", "when": "Onboarding + quarterly", "feeds": []}, {"id": "s-guidelines", "title": "Brand guidelines", "short": "Video, static, story, caption tone and ad rules per retainer.", "detail": "One guideline page per retainer covering video style, statics, stories, the caption tone prompt, ad rules, and do's and don'ts. It's loaded as knowledge in the retainer's Claude Project so every AI step uses it automatically. Refreshed on the quarterly refresh day.", "mode": "manual", "owner": "isabella", "tool": "Notion + Claude Project", "when": "Quarterly", "feeds": []}, {"id": "s-hooks", "title": "Update the Hook Bank", "short": "Add trending hooks and tag which ones performed.", "detail": "A Notion database of hooks with format, industry, source, times used and average 3-second hold. A monthly Claude task adds 20 trending hooks, and Metricool data marks which hooks actually worked for your accounts.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task + Metricool", "when": "Monthly", "feeds": []}, {"id": "s-structures", "title": "Video structure library", "short": "Templates: before/after, job walk, myth vs fact, POV, offer.", "detail": "Keep a library of proven video structures with reference links. Refresh it on the same quarterly day as the guidelines.", "mode": "manual", "owner": "isabella", "tool": "Notion", "when": "Quarterly", "feeds": []}, {"id": "s-field", "title": "Field ideas from real jobs", "short": "10 grounded ideas per retainer from jobs and client questions.", "detail": "Isabella and Esteban log ideas from real jobs, client FAQs and things heard on site through a Notion form on the phone. Entries land straight in the Idea Bank.", "mode": "hybrid", "owner": "isabella", "tool": "Notion form", "when": "Ongoing", "feeds": []}, {"id": "s-strategy", "title": "Monthly strategy (1 page)", "short": "Sales goal, pillar mix, what to double down on and cut.", "detail": "Claude drafts one page per retainer: the month's sales goal, pillar mix, what to double down on and what to cut, the offer to push, and ad tests. Andres approves in the Monday founder meeting, about 5 minutes per retainer.", "mode": "hybrid", "owner": "andres", "tool": "Claude skill: monthly-plan", "when": "Monthly, week 4", "feeds": ["s-ideas"]}, {"id": "s-ideas", "title": "Generate 40 ideas", "short": "Each tagged with pillar, format, hook, sales job and CTA.", "detail": "The retainer's Claude Project uses the guidelines, reports and Hook Bank as context to produce 40 ideas. Each one is tagged with pillar, format, hook, sales job, CTA and shoot needs. One generator only; other AI tools are optional critics.", "mode": "auto", "owner": "isabella", "tool": "Claude Project (per retainer)", "when": "Monthly, week 4", "feeds": []}, {"id": "s-score", "title": "Score and keep the top 25", "short": "Rubric: hook, sales intent, persona fit, shootable, not repeated.", "detail": "Claude scores every idea from 1 to 5 on hook strength, sales intent, persona fit, whether it can be shot in one 3-hour shoot, and whether it repeats the last 90 days. The top 25 are kept.", "mode": "auto", "owner": "isabella", "tool": "Claude Project", "when": "Monthly, week 4", "feeds": []}, {"id": "s-pick", "title": "Final pick", "short": "Tier count + 3 backups. The rest go to the Idea Bank.", "detail": "Isabella picks the final pieces: Visible ~12, Authority 18, Growth 18 plus 10 ads, and 3 backups each. Unused ideas are saved in the searchable Idea Bank database, not a Drive folder.", "mode": "manual", "owner": "isabella", "tool": "Notion Idea Bank", "when": "Monthly, week 4", "feeds": ["p-scripts"]}]}, {"id": "st1b", "name": "Planning", "when": "Week 4 of M-2", "steps": [{"id": "p-scripts", "title": "Scripts and shot lists", "short": "Hook line, beats, B-roll, who's on camera, CTA.", "detail": "Claude drafts a script and shot list for every piece in one run and writes it into each Notion item. Isabella edits.", "mode": "hybrid", "owner": "isabella", "tool": "Claude Project", "when": "Week 4 of M-2", "feeds": []}, {"id": "p-stories", "title": "Story plan", "short": "One theme per weekday plus a story capture list.", "detail": "Example frame: Mon crew, Tue job progress, Wed FAQ, Thu review, Fri offer. Ask the client's crew for 3 phone clips a week through an upload link.", "mode": "manual", "owner": "isabella", "tool": "Notion", "when": "Week 4 of M-2", "feeds": []}, {"id": "p-props", "title": "Set Notion properties", "short": "Format, type, pillar, sales job, dates, links, status.", "detail": "A Notion template button fills defaults by tier. Every automation reads the same status flow: Idea, Scripted, Shoot booked, Shot, Editing, QC, Client review, Approved, Scheduled, Posted, Analyzed.", "mode": "auto", "owner": "isabella", "tool": "Notion template button", "when": "Week 4 of M-2", "feeds": []}, {"id": "p-captions", "title": "Captions in brand tone", "short": "One run fills every caption, with search keywords.", "detail": "The retainer's Claude Project already holds the tone prompt, so one run writes every caption plus keywords for Instagram search and Google Business posts. Isabella checks.", "mode": "hybrid", "owner": "isabella", "tool": "Claude Project", "when": "Week 4 of M-2", "feeds": []}, {"id": "p-calendar", "title": "Calendar and shoot days", "short": "Max 3 shoot days per retainer, shooter assigned, post dates.", "detail": "Isabella sets shoot days and post dates in the Notion calendar. Shoot dates sync to the shooter's Google Calendar automatically.", "mode": "hybrid", "owner": "isabella", "tool": "Notion + Zapier → Google Calendar", "when": "Week 4 of M-2", "feeds": ["c-invite"]}, {"id": "p-brief", "title": "Shoot Brief per shoot day", "short": "Every piece, shots, props, people, access, weather backup.", "detail": "A Claude skill reads every Notion item with that shoot date and builds one brief: pieces, shots, props, people, location, client contact, parking and access, plus a weather backup.", "mode": "auto", "owner": "isabella", "tool": "Claude skill + Notion", "when": "Week 4 of M-2", "feeds": []}, {"id": "p-folders", "title": "Create Drive folders", "short": "Retainer / Cycle / RAW and Deliverables / piece.", "detail": "When a piece hits Scripted, an automation creates its RAW and Deliverables folders in Drive and writes the links back to Notion.", "mode": "auto", "owner": "isabella", "tool": "Make or Zapier + Google Drive", "when": "On status: Scripted", "feeds": []}, {"id": "p-approve", "title": "Client approves the month plan", "short": "3 business days; silence counts as approval.", "detail": "Esteban sends the list and scripts through the weekly client briefing page. An automatic reminder goes out on day 2. This matches the contract: week 1 is plan approval.", "mode": "hybrid", "owner": "esteban", "tool": "Client briefing page + Zapier reminder", "when": "End of week 4", "feeds": []}]}, {"id": "st1c", "name": "Shooting", "when": "Week 1 of M-1", "steps": [{"id": "c-invite", "title": "Shooter gets the invite and brief", "short": "Calendar event with the Shoot Brief link attached.", "detail": "Created automatically from the planning calendar, with the Shoot Brief attached.", "mode": "auto", "owner": "shooter", "tool": "Google Calendar + Notion", "when": "On scheduling", "feeds": []}, {"id": "c-confirm", "title": "48-hour confirmation", "short": "Confirm time, access, who's on camera. Check the weather.", "detail": "An auto-text confirms time, site access, who's on camera and that the site is clean. Esteban handles replies and checks the weather for exterior shots.", "mode": "hybrid", "owner": "esteban", "tool": "QUO via Zapier + HubSpot contact", "when": "48 h before", "feeds": []}, {"id": "c-shoot", "title": "Shoot the pieces", "short": "Follow the brief order. 3 hook takes for every ad.", "detail": "Shoot in brief order. Every ad concept gets 3 different opening hooks. That's the cheapest A/B test there is.", "mode": "manual", "owner": "shooter", "tool": "Shoot Brief on phone", "when": "Week 1 of M-1", "feeds": []}, {"id": "c-broll", "title": "Capture the B-roll library", "short": "Crew, trucks, tools, drone, details, portraits.", "detail": "Ten seconds each of crew working, trucks, tools, drone and exterior shots, details, and team portraits. This fixes missing B-roll and feeds AI generation and ads later.", "mode": "manual", "owner": "shooter", "tool": "Checklist in Shoot Brief", "when": "Every shoot", "feeds": []}, {"id": "c-release", "title": "Releases and testimonials", "short": "Signed release for anyone on camera; 30-second testimonial.", "detail": "Get a signed release from any homeowner or crew member on camera. When the customer is happy, ask for a 30-second testimonial. Testimonial ads aren't allowed without consent.", "mode": "hybrid", "owner": "shooter", "tool": "Tally form with signature", "when": "Every shoot", "feeds": []}, {"id": "c-upload", "title": "Upload within 24 hours", "short": "Named files in RAW / piece; status flips to Shot.", "detail": "Upload to RAW / piece within 24 hours, named client_piece_take. A new file in the folder sets the Notion status to Shot automatically.", "mode": "hybrid", "owner": "shooter", "tool": "Google Drive + Zapier", "when": "Within 24 h", "feeds": []}, {"id": "c-cull", "title": "Culling and selects", "short": "Best takes plus a selects note for the editor.", "detail": "AI pre-selects the best takes from transcripts, and Isabella confirms and writes timestamps and the best hook take for the editor. This was the step eating whole founder days.", "mode": "hybrid", "owner": "isabella", "tool": "Claude skill + Descript transcripts", "when": "Within 48 h", "feeds": ["e-assign"]}]}, {"id": "st1d", "name": "Editing & QC", "when": "Week 2 of M-1, approved by day 15", "steps": [{"id": "e-assign", "title": "Auto-assign the editor", "short": "Triggered on Shot; style reference already set.", "detail": "When a piece hits Shot, the assigned editor is notified with the style reference and selects note. Editors never wait for direction.", "mode": "auto", "owner": "isabella", "tool": "Notion + Zapier notification", "when": "On status: Shot", "feeds": []}, {"id": "e-ai", "title": "AI edit lane", "short": "Captions, cut-downs, resizes and variants by AI.", "detail": "Simple formats go to AI tools: talking-head cuts, captions, cut-downs, ad resizes. Higgsfield handles B-roll and ad variants. Claude writes the edit notes from the guidelines.", "mode": "hybrid", "owner": "isabella", "tool": "Descript / CapCut / Submagic + Higgsfield", "when": "Week 2 of M-1", "feeds": []}, {"id": "e-edit", "title": "Editor cuts to the reference", "short": "Hero videos edited by a human to the style reference.", "detail": "Hero reels and anything needing taste are edited by a human editor against the reference video.", "mode": "manual", "owner": "editor", "tool": "CapCut / Premiere", "when": "Week 2 of M-1", "feeds": []}, {"id": "e-statics", "title": "Statics and carousels", "short": "Real shoot photo + Canva brand template first.", "detail": "Start from a real job photo and the brand's Canva template. Canva Bulk Create builds the month's carousels from Notion in one go. AI is only for backgrounds, composites and ad variants. Contractors sell trust, so real jobs win.", "mode": "hybrid", "owner": "isabella", "tool": "Canva Bulk Create + Higgsfield + Claude", "when": "Week 2 of M-1", "feeds": []}, {"id": "e-copy", "title": "Copy check", "short": "English, spelling, claims and CTA on every file.", "detail": "Claude checks every static, carousel, caption and subtitle for English, spelling, claims and the CTA before QC sees it.", "mode": "auto", "owner": "isabella", "tool": "Claude", "when": "Before QC", "feeds": []}, {"id": "e-qc", "title": "QC: 10-point checklist", "short": "Pass = 9/10. Founders spot-check 1 per retainer weekly.", "detail": "Hook in 1.5 s, matches reference, safe zones, captions, brand fonts and colors, audio, licensed music, CTA, length and ratio, no errors. Pass is 9/10. Claude pre-checks text; Isabella checks visuals.", "mode": "hybrid", "owner": "isabella", "tool": "Notion QC score + Claude pre-check", "when": "Week 2 of M-1", "feeds": []}, {"id": "e-client", "title": "Client review", "short": "One batch link, max 2 rounds, silence = approved.", "detail": "Esteban sends one link with the whole batch and asks for consolidated feedback. Reminder on day 2, auto-approve on day 4. Maximum 2 revision rounds, per the contract.", "mode": "hybrid", "owner": "esteban", "tool": "Client briefing page + Zapier", "when": "By day 15 of M-1", "feeds": ["m-schedule"]}, {"id": "e-revise", "title": "Batched revisions", "short": "Fixes done once a week, not as a daily drip.", "detail": "Revisions are batched once a week and the revision count is logged on the piece. The editor scorecard tracks it monthly.", "mode": "manual", "owner": "editor", "tool": "Notion", "when": "Weekly", "feeds": []}]}]}, {"id": "sys2", "code": "2", "name": "Social media management", "short": "Scheduling, Google Business, stories, comment-to-lead.", "cadence": "Daily automation", "stages": [{"id": "st2", "name": "Scheduling & publishing", "when": "Daily", "steps": [{"id": "m-schedule", "title": "Auto-schedule approved posts", "short": "At the best time per account; status flips to Scheduled.", "detail": "A daily Claude task finds every piece marked Approved, schedules it in Metricool at the best time for that account, flips Notion to Scheduled and saves the post ID.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task + Metricool + Notion", "when": "Daily", "feeds": []}, {"id": "m-posted", "title": "Mark as Posted", "short": "Closes the loop Metricool doesn't close itself.", "detail": "The same daily task checks Metricool and flips live posts to Posted in Notion.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task", "when": "Daily", "feeds": []}, {"id": "m-gbp", "title": "Google Business posts", "short": "1–2 a week: recent job, photo, service, city.", "detail": "Every plan includes Google Business Profile. Repurpose the week's best post as a GBP post.", "mode": "auto", "owner": "isabella", "tool": "Metricool (GBP)", "when": "Weekly", "feeds": []}, {"id": "m-stories", "title": "Daily stories", "short": "From the story plan and crew clips.", "detail": "Post daily stories from the story plan and the client crew's phone clips.", "mode": "hybrid", "owner": "isabella", "tool": "Metricool or native app", "when": "Daily", "feeds": []}, {"id": "m-dm", "title": "Comment-to-lead DMs", "short": "\"Comment ROOF\" → auto-DM with the booking link → HubSpot.", "detail": "AG doesn't answer client DMs, so automation catches buying intent: a keyword comment triggers a DM with the booking page, and the lead lands in HubSpot. The client still handles real conversations.", "mode": "auto", "owner": "isabella", "tool": "ManyChat + Zapier → HubSpot", "when": "Always on", "feeds": ["l-intake"]}, {"id": "m-results", "title": "Results back to Notion", "short": "7 days after posting, metrics fill the Results field.", "detail": "Metrics flow back to Notion automatically. They feed next month's strategy and Monday's boost candidates.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task (Metricool → Notion)", "when": "Post + 7 days", "feeds": ["s-perf", "b-candidates"]}, {"id": "m-report", "title": "Monthly client report", "short": "Sales first: leads, appointments, top posts and why.", "detail": "Claude drafts a sales-led report, Isabella checks it and Esteban sends it by the 1st.", "mode": "hybrid", "owner": "esteban", "tool": "Claude + Metricool + HubSpot", "when": "By the 1st", "feeds": []}]}]}, {"id": "sys3", "code": "3", "name": "Lead & reputation automation", "short": "Booking page, client number, reviews, lead intake.", "cadence": "Set up once, runs always", "stages": [{"id": "st3", "name": "Setup + always-on flows", "when": "Onboarding", "steps": [{"id": "l-gbp", "title": "Google Business Profile setup", "short": "Categories, services, areas, 20+ photos, Q&A, matching NAP.", "detail": "Manager access, then a full setup: categories, services, service areas, hours, 20+ real job photos, Q&A, and the same name, address and phone everywhere. This drives Google and AI search visibility.", "mode": "manual", "owner": "andres", "tool": "Google Business Profile", "when": "Onboarding", "feeds": []}, {"id": "l-page", "title": "Booking page", "short": "One offer, proof, short form with qualifying questions.", "detail": "Cloned from the template. Asks ZIP, homeowner yes/no, service and timeline. Hidden fields capture UTMs and the ad click ID. Includes an unchecked SMS consent box with clear wording.", "mode": "manual", "owner": "andres", "tool": "Own builder or HubSpot + Calendly", "when": "Onboarding", "feeds": []}, {"id": "l-number", "title": "Client's own QUO number", "short": "Registered under the client (A2P 10DLC); missed-call text-back on.", "detail": "Texts must come from a number registered to the client's business. Approval takes about 2–5 business days, so start in week 1. After setup, missed calls get an instant text with the booking link.", "mode": "hybrid", "owner": "andres", "tool": "QUO", "when": "Onboarding, then always on", "feeds": []}, {"id": "l-reviews", "title": "Review request after every job", "short": "Day 0 text with the Google link, one reminder on day 3.", "detail": "Triggered when a job is marked complete in the client's CRM. Clients with no CRM fill a 10-second Job Done form. Every customer gets the Google link; never only the happy ones.", "mode": "auto", "owner": "client", "tool": "Zapier + QUO (form fallback)", "when": "On job done", "feeds": []}, {"id": "l-replies", "title": "Reply to every Google review", "short": "Within 48 hours, drafted by Claude.", "detail": "A new review triggers a Claude draft reply, which Isabella approves and posts.", "mode": "hybrid", "owner": "isabella", "tool": "Zapier → Claude", "when": "Within 48 h", "feeds": []}, {"id": "l-intake", "title": "Lead intake", "short": "Form or DM → HubSpot → instant text → setter alert.", "detail": "Every lead source (form, Calendly, lead ad, ManyChat) creates a HubSpot contact tagged with client and source, sends an instant text from the client's number with the booking link, and alerts the setter to call within 5 minutes.", "mode": "auto", "owner": "setter", "tool": "Zapier + HubSpot + QUO", "when": "Instant", "feeds": ["a-alert"]}]}]}, {"id": "sys4", "code": "4", "name": "Boosting for local exposure", "short": "Rule-based boosts that build warm local audiences.", "cadence": "Weekly", "stages": [{"id": "st4", "name": "Weekly boost loop", "when": "Every Monday", "steps": [{"id": "b-candidates", "title": "List boost candidates", "short": "Top 25% hold rate and above-average share/save rate.", "detail": "Every Monday a Claude task lists posts from the last 14 days that clear the threshold into a Notion view.", "mode": "auto", "owner": "isabella", "tool": "Claude scheduled task + Metricool", "when": "Every Monday", "feeds": []}, {"id": "b-pick", "title": "Pick 1–2 per client", "short": "Proof or trust pieces with a clear local tie only.", "detail": "Never boost pure entertainment, because it attracts viewers outside the service area.", "mode": "manual", "owner": "isabella", "tool": "Notion", "when": "Every Monday", "feeds": []}, {"id": "b-launch", "title": "Launch in Ads Manager", "short": "Engagement/video views, service area, pre-approved budget.", "detail": "Duplicate the saved template campaign. Not the Boost button. The budget was approved once in the contract, so there's no weekly asking.", "mode": "hybrid", "owner": "isabella", "tool": "Meta Ads Manager", "when": "Every Monday", "feeds": []}, {"id": "b-audience", "title": "Save viewers for retargeting", "short": "People who watched 50%+ become a warm audience.", "detail": "This is what turns boosting into leads: Growth ads retarget these warm local viewers.", "mode": "auto", "owner": "isabella", "tool": "Meta custom audiences", "when": "Always on", "feeds": ["ad-launch"]}, {"id": "b-track", "title": "Track boost results", "short": "Cost per 1,000 local reach, views, visits, later leads.", "detail": "Results feed the monthly report and prove the client's boost money is working.", "mode": "auto", "owner": "isabella", "tool": "Windsor.ai / Metricool", "when": "Monthly", "feeds": []}]}]}, {"id": "sys5", "code": "5", "name": "Ad creatives & A/B tests", "short": "Offer + diverse creative + real sales data back to Meta.", "cadence": "Monthly build, weekly review", "stages": [{"id": "st5", "name": "Ads loop", "when": "Monthly + weekly", "steps": [{"id": "ad-found", "title": "Foundations check", "short": "Offer, pixel + CAPI, Instant Forms, outcome stages, speed.", "detail": "No spend until all are green: an offer worth responding to, pixel and Conversions API, Instant Forms with qualifying questions, HubSpot outcome stages the client logs, and speed-to-lead under 5 minutes.", "mode": "manual", "owner": "andres", "tool": "Meta Events Manager + HubSpot", "when": "Onboarding", "feeds": []}, {"id": "ad-concepts", "title": "Choose ad concepts", "short": "Picked with the content plan; the same shoot captures them.", "detail": "Pick from the creative menu: direct-response, problem/solution, offer, testimonial, before/after, owner to camera, myth-buster, what to expect.", "mode": "hybrid", "owner": "isabella", "tool": "Claude Project + Notion", "when": "Week 4 of M-2", "feeds": []}, {"id": "ad-build", "title": "Build 10 ads", "short": "2 concepts × 3 hooks, 1 testimonial, 3 statics, all resized.", "detail": "Variants and resizes in 9:16, 4:5 and 1:1.", "mode": "hybrid", "owner": "editor", "tool": "Higgsfield + Canva + CapCut", "when": "Week 2 of M-1", "feeds": []}, {"id": "ad-launch", "title": "Launch the campaign", "short": "1 Leads campaign: prospecting + retargeting ad sets.", "detail": "Advantage+ on, location limited to the service area, 6–15 genuinely different ads per ad set, about 70–80% prospecting and 20–30% retargeting.", "mode": "manual", "owner": "isabella", "tool": "Meta Ads Manager", "when": "Start of month", "feeds": []}, {"id": "ad-review", "title": "Weekly kill / keep / scale", "short": "Written rules, drafted by Claude, signed off by Andres.", "detail": "Kill at 2x target cost per qualified appointment with zero appointments. Scale under target for 7 days by about 20% every 3–4 days. Refresh when frequency passes ~3 or click rate drops 30%.", "mode": "hybrid", "owner": "andres", "tool": "Claude scheduled task + Windsor.ai", "when": "Every Monday", "feeds": []}, {"id": "ad-capi", "title": "Send outcomes to Meta", "short": "Showed / quoted / won go back so Meta learns real jobs.", "detail": "HubSpot stages flow to Meta's Conversions API for CRM. Once there's enough volume, switch the goal to Conversion Leads. Expect 2–3 months to learn.", "mode": "auto", "owner": "andres", "tool": "HubSpot / Zapier → Meta CAPI", "when": "Daily", "feeds": []}, {"id": "ad-report", "title": "15-day client report", "short": "Spend, appointments, cost per appointment, jobs won.", "detail": "What was cut and what we're doubling down on, drafted by Claude and sent by Esteban.", "mode": "hybrid", "owner": "esteban", "tool": "Claude + Windsor.ai + HubSpot", "when": "Every 15 days", "feeds": []}, {"id": "ad-double", "title": "Double down on winners", "short": "Winning concepts get 3 new hooks next month.", "detail": "Winners flow into next month's strategy.", "mode": "manual", "owner": "isabella", "tool": "Notion", "when": "Monthly", "feeds": ["s-strategy"]}]}]}, {"id": "sys6", "code": "6", "name": "Lead management & appointments", "short": "Speed to lead, qualify, book, hand over, bill.", "cadence": "Real time", "stages": [{"id": "st6", "name": "Lead to appointment", "when": "Real time", "steps": [{"id": "a-alert", "title": "Lead alert", "short": "Shared QUO inbox + HubSpot \"Call now\" task.", "detail": "Alerts go to a shared inbox, not anyone's personal phone, so whoever is on duty sees them.", "mode": "auto", "owner": "setter", "tool": "Zapier + HubSpot + QUO", "when": "Instant", "feeds": []}, {"id": "a-call", "title": "Call within 5 minutes", "short": "Business hours. After-hours leads get a call at 8 am.", "detail": "A setter role, not Andres. No calls or texts before 8 am or after 9 pm local time.", "mode": "manual", "owner": "setter", "tool": "QUO app", "when": "Within 5 min", "feeds": []}, {"id": "a-qualify", "title": "Qualify with the script", "short": "Service area, decision-maker, real need, timeline.", "detail": "These are the contract's billing criteria, asked in order.", "mode": "manual", "owner": "setter", "tool": "HubSpot call guide", "when": "On the call", "feeds": []}, {"id": "a-cadence", "title": "Follow-up cadence", "short": "Now, +1 h, next morning, day 3, day 7, then monthly.", "detail": "Tasks and texts are automated; the calls stay human. Most contractor leads are won on the 2nd to 5th try.", "mode": "hybrid", "owner": "setter", "tool": "HubSpot sequence + QUO", "when": "Days 0–7", "feeds": []}, {"id": "a-book", "title": "Book, confirm, remind", "short": "Confirmation text, then reminders 24 h and 2 h before.", "detail": "Booked on the client's calendar. Reminders raise the show rate.", "mode": "hybrid", "owner": "setter", "tool": "Calendly + Zapier → QUO", "when": "On booking", "feeds": []}, {"id": "a-handover", "title": "Hand over to the client", "short": "Lead summary by text and email.", "detail": "Name, address, problem, photos and time, sent automatically.", "mode": "auto", "owner": "client", "tool": "HubSpot workflow", "when": "On booking", "feeds": []}, {"id": "a-log", "title": "Call logged with AI summary", "short": "Recording and summary land in HubSpot.", "detail": "No more typing notes by hand.", "mode": "auto", "owner": "setter", "tool": "QUO → HubSpot integration", "when": "After each call", "feeds": []}, {"id": "a-outcome", "title": "Client logs the outcome", "short": "Showed / quoted / won ($) / lost (why) within 48 h.", "detail": "Reminders repeat until it's logged. This feeds Meta and billing.", "mode": "hybrid", "owner": "client", "tool": "HubSpot link or 3-button text", "when": "Within 48 h", "feeds": ["ad-capi"]}, {"id": "a-bill", "title": "Month-end billing", "short": "Count qualified appointments; 7-day dispute window.", "detail": "$125 per qualified appointment, capped at 20 a month. Claude drafts the report and invoice, Andres approves.", "mode": "hybrid", "owner": "andres", "tool": "HubSpot report + Stripe", "when": "Month end", "feeds": []}]}]}], "flows": [{"from": "sys1", "to": "sys2", "label": "Approved content"}, {"from": "sys2", "to": "sys1", "label": "Post results"}, {"from": "sys2", "to": "sys4", "label": "Top posts"}, {"from": "sys2", "to": "sys6", "label": "DM leads"}, {"from": "sys3", "to": "sys6", "label": "New leads"}, {"from": "sys4", "to": "sys5", "label": "Warm audiences"}, {"from": "sys6", "to": "sys5", "label": "Sales outcomes"}, {"from": "sys5", "to": "sys1", "label": "Winning ads"}]};
+
+const PK_VAR = { visible: "var(--pk-visible)", authority: "var(--pk-authority)", growth: "var(--pk-growth)" };
+const PK_EXTRA = ["#1f9e9a", "#b5852b", "#5b6b8a"];
+const AV_COLORS = ["#2b47e6", "#c2367a", "#129b4d", "#e2700f", "#7a4de8", "#1f9e9a", "#5b6b8a", "#b5852b", "#d13b3b"];
+const MODES = { auto: "Automated", hybrid: "AI + human check", manual: "Manual" };
+const BASE_TOOLS = ["Claude", "Claude Project", "Claude scheduled task", "Claude skill", "Zapier", "Make", "Notion", "HubSpot", "QUO", "Metricool", "Google Drive", "Google Calendar", "Canva", "Higgsfield", "CapCut", "Descript", "Meta Ads Manager", "Meta CAPI", "Windsor.ai", "ManyChat", "Calendly", "Tally", "Stripe"];
+
+const NOTION = "Notion";
+const CAL_DS = "3133e319-a799-80ed-8834-000bf9648d9f";
+const CUST_DS = "collection://2e43e319-a799-8052-b15b-000b03d199c2";
+const MAP_URL = location.origin;
+const OWNER_OPTS = ["ANDRES", "ESTEBAN", "ISABELLA"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+let mcp = null, customers = null, custErr = "";
+const calState = {}, statusTimers = {};
+
+let db = null, canWrite = true, maps = {}, curId = "template", doc = null;
+let dirty = false, saving = false, queued = false, saveTimer = null, loaded = false;
+let undoStack = [];
+const ui = { pkg: null, owner: null, mode: null, hoverSys: null, drawer: null, armed: null };
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const rid = p => p + "-" + Math.random().toString(36).slice(2, 8);
+
+/* ---------- data helpers ---------- */
+function person(id) { return doc.people.find(p => p.id === id) || { id, name: id ? id : "Unassigned", role: "" }; }
+function personColor(id) { const i = doc.people.findIndex(p => p.id === id); return AV_COLORS[(i < 0 ? 8 : i) % AV_COLORS.length]; }
+function initials(n) { return String(n || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase(); }
+function av(id, size) { const p = person(id); return `<span class="av" style="background:${personColor(id)}${size ? `;width:${size}px;height:${size}px` : ""}" aria-hidden="true">${esc(initials(p.name))}</span>`; }
+function pkColor(pk, i) { return PK_VAR[pk.id] || PK_EXTRA[i % PK_EXTRA.length]; }
+function locate(stepId) {
+  for (const sys of doc.systems) for (let si = 0; si < sys.stages.length; si++) {
+    const st = sys.stages[si]; const idx = st.steps.findIndex(s => s.id === stepId);
+    if (idx > -1) return { sys, stage: st, si, idx, step: st.steps[idx] };
+  }
+  return null;
+}
+function label(sys, si, idx) { return sys.code + (sys.stages.length > 1 ? String.fromCharCode(65 + si) : "") + "." + (idx + 1); }
+function labelOf(stepId) { const l = locate(stepId); return l ? label(l.sys, l.si, l.idx) : "?"; }
+function sysSteps(sys) { return sys.stages.flatMap(s => s.steps); }
+function counts(steps) { const c = { auto: 0, hybrid: 0, manual: 0 }; steps.forEach(s => c[s.mode] = (c[s.mode] || 0) + 1); return c; }
+function inPkg(sysId) { if (!ui.pkg) return true; const p = doc.packages.find(p => p.id === ui.pkg); return !p || p.systems.includes(sysId); }
+function isRetainer() { return doc.kind === "retainer"; }
+function monthLong(m) { if (!m) return ""; const [y, mo] = m.split("-"); return MONTHS[+mo - 1] + " " + y; }
+function monthShort(m) { if (!m) return ""; return MONTHS[+m.split("-")[1] - 1].slice(0, 3).toUpperCase(); }
+function addMonth(m, n) { const [y, mo] = m.split("-").map(Number); const d = new Date(y, mo - 1 + n, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+function thisMonth() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); }
+function shortName(n) { return String(n || "").trim().split(/\s+/)[0].replace(/[’']S$/i, "").replace(/[^\p{L}\p{N}&-]/gu, "").toUpperCase(); }
+function prettyDate(d) { if (!d) return ""; const [y, m, dd] = d.split("-").map(Number); return MONTHS[m - 1].slice(0, 3) + " " + dd; }
+function stripTags(s) { return String(s || "").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim(); }
+function sysPeople(sys) { return [...new Set(sysSteps(sys).map(s => s.owner).filter(Boolean))]; }
+function doneCount(steps) { return steps.filter(s => s.done).length; }
+
+/* ---------- Notion (General Calendar) ---------- */
+async function notion(tool, input) {
+  if (!mcp) throw { code: "not_granted" };
+  const r = await mcp.callTool(NOTION, tool, input);
+  return r && r.payload !== undefined ? r.payload : r;
+}
+function errText(e) {
+  switch (e && e.code) {
+    case "server_not_connected": return "Add the Notion connector in claude.ai Settings → Connectors";
+    case "needs_reauth": return "Reconnect Notion in claude.ai Settings → Connectors";
+    case "selection_required": return "Choose which Notion connection this page should use";
+    case "not_in_manifest": case "approval_required": case "consent_required": return "Allow this page to use Notion, then retry";
+    case "blocked_by_policy": return "Your organization blocks this Notion action";
+    case "tool_error": return "Notion refused the change: " + String(e.message || "").slice(0, 120);
+    case "not_granted": case "capability_disabled": case "capability_removed": return "Notion isn't connected — add NOTION_TOKEN in Vercel";
+    default: return "Couldn't confirm with Notion — check the calendar, then retry";
+  }
+}
+function findRef(p) {
+  const s = typeof p === "string" ? p : JSON.stringify(p || "");
+  const u = s.match(/https:\/\/[a-z.]*notion\.(?:so|com)\/[^\s"'\\<>)]*?[0-9a-f]{32}/i);
+  if (u) return u[0];
+  const id = s.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return id ? id[0] : null;
+}
+function calTitle(sys) { const mon = monthShort(doc.month); return `${sys.code}. ${(doc.short || shortName(doc.client && doc.client.name) || doc.name).toUpperCase()} · ${sys.name.toUpperCase()}${mon ? " (" + mon + ")" : ""}`; }
+function calOwners(sys) { return [...new Set(sysPeople(sys).map(id => String(person(id).name || "").toUpperCase()).filter(n => OWNER_OPTS.includes(n)))]; }
+function calStatus(sys) { const st = sysSteps(sys), d = doneCount(st); return d === 0 ? "To do" : d === st.length ? "Complete" : "In Progress"; }
+function calContent(sys) {
+  const names = sysPeople(sys).map(id => person(id).name).join(", ");
+  let md = `**Today:** ${sys.short}\n\nPeople: ${names}\n\nChecklist lives in the [Systems Map](${MAP_URL}) (${doc.name}). Tick steps there.\n`;
+  sys.stages.forEach((stg, si) => {
+    md += `\n## ${stg.name}\n\n`;
+    stg.steps.forEach((s, i) => { md += `- [ ] ${label(sys, si, i)} ${s.title} · ${person(s.owner).name}${s.mode !== "manual" && s.tool ? " · " + s.tool : ""}\n`; });
+  });
+  return md;
+}
+async function syncSystem(sysId) {
+  const sys = doc.systems.find(s => s.id === sysId); if (!sys || !isRetainer()) return;
+  const cs = calState[sysId] || (calState[sysId] = {});
+  if (!mcp) { cs.state = "error"; cs.msg = errText({ code: "not_granted" }); renderLanes(); return; }
+  if (cs.busy) { cs.again = true; return; }
+  if (!sys.calPage && !sys.date) { cs.state = null; renderLanes(); return; }
+  cs.busy = true; cs.state = "syncing"; renderLanes();
+  const mapId = curId;
+  const props = { "Owner": calOwners(sys), "Status": calStatus(sys) };
+  if (sys.date) { props["date:Date:start"] = sys.date; props["date:Date:is_datetime"] = 0; } else props["date:Date:start"] = null;
+  try {
+    if (!sys.calPage) {
+      Object.assign(props, { "Name": calTitle(sys), "Kind": "Retainer" });
+      if (doc.client && doc.client.url) props["Client"] = [doc.client.url];
+      const p = await notion("notion-create-pages", { parent: { type: "data_source_id", data_source_id: CAL_DS }, pages: [{ properties: props, content: calContent(sys) }] });
+      const ref = findRef(p);
+      if (!ref) throw { code: "no_ref" };
+      if (curId === mapId) edit(d => { const s = d.systems.find(x => x.id === sysId); if (s) { s.calPage = ref; s.calStatus = props.Status; } }, { noUndo: true, keepDrawer: true });
+    } else {
+      await notion("notion-update-page", { page_id: sys.calPage, command: "update_properties", properties: props });
+      if (curId === mapId) edit(d => { const s = d.systems.find(x => x.id === sysId); if (s) s.calStatus = props.Status; }, { noUndo: true, keepDrawer: true });
+    }
+    cs.state = "ok"; cs.msg = "";
+  } catch (e) {
+    cs.state = "error";
+    cs.msg = e && e.code === "no_ref" ? "Added, but the page link didn't come back — check the calendar" : errText(e);
+  }
+  cs.busy = false; renderLanes();
+  if (cs.again) { cs.again = false; syncSystem(sysId); }
+}
+function queueStatusSync(sysId) {
+  const sys = doc.systems.find(s => s.id === sysId);
+  if (!sys || !sys.calPage) return;
+  clearTimeout(statusTimers[sysId]);
+  statusTimers[sysId] = setTimeout(() => { const s = doc.systems.find(x => x.id === sysId); if (s && calStatus(s) !== s.calStatus) syncSystem(sysId); }, 1500);
+}
+async function pullFromNotion(manual) {
+  if (!mcp || !isRetainer()) { if (manual) setStatus("Notion isn't connected — add NOTION_TOKEN in Vercel", "warn"); return; }
+  const mapId = curId; let changed = 0, failed = 0;
+  if (manual) setStatus("Checking the Notion calendar…", "saving");
+  for (const sys of doc.systems) {
+    if (!sys.calPage) continue;
+    try {
+      const p = await notion("notion-fetch", { id: sys.calPage });
+      const txt = typeof p === "string" ? p : (p && p.text) || JSON.stringify(p);
+      const m = txt.match(/<properties>\s*([\s\S]*?)\s*<\/properties>/); if (!m) continue;
+      const pr = JSON.parse(m[1]); const day = pr["date:Date:start"] ? String(pr["date:Date:start"]).slice(0, 10) : "";
+      if (curId !== mapId) return;
+      if (day !== (sys.date || "")) { const id = sys.id; edit(d => { const s = d.systems.find(x => x.id === id); if (s) s.date = day; }, { noUndo: true, keepDrawer: true }); changed++; }
+    } catch (e) { failed++; if (manual) { setStatus(errText(e), "warn"); return; } }
+  }
+  if (manual) setStatus(changed ? `Updated ${changed} date${changed > 1 ? "s" : ""} from the Notion calendar` : failed ? "Some calendar pages couldn't be read" : "Dates already match the Notion calendar", changed || !failed ? "saved" : "warn");
+}
+async function loadCustomers() {
+  if (customers || !mcp) return;
+  try {
+    const p = await notion("notion-query-data-sources", { data: { mode: "rows", data_source_url: CUST_DS, limit: 100 } });
+    const rows = (p && p.results) || [];
+    customers = rows.filter(r => r.Type === "Retainer" && r.Status !== "Churned")
+      .map(r => ({ name: stripTags(r.Name), tier: r.Tier || "", url: r.url }))
+      .filter(c => c.name && c.name.toUpperCase() !== "RETAINER TEMPLATE");
+  } catch (e) { customers = []; custErr = errText(e); }
+  if (ui.drawer && ui.drawer.type === "newmap") { ui.drawer.force = true; renderDrawer(); }
+}
+
+/* ---------- persistence ---------- */
+function setStatus(text, s) { const el = $("#status"); el.textContent = text; el.dataset.s = s || ""; }
+function edit(fn, opts = {}) {
+  if (!opts.noUndo) { undoStack.push(JSON.stringify(doc)); if (undoStack.length > 50) undoStack.shift(); }
+  fn(doc);
+  dirty = true;
+  render(opts);
+  scheduleSave();
+}
+function scheduleSave() {
+  $("#undoBtn").disabled = !undoStack.length;
+  if (!db) { setStatus("Preview — changes aren't saved", "warn"); return; }
+  if (!canWrite) { setStatus("View only — changes aren't saved", "warn"); return; }
+  setStatus("Saving…", "saving");
+  clearTimeout(saveTimer); saveTimer = setTimeout(save, 700);
+}
+async function save() {
+  if (!db || !canWrite) return;
+  if (saving) { queued = true; return; }
+  saving = true;
+  doc.rev = (doc.rev || 0) + 1; doc.updatedAt = Date.now();
+  const id = curId, body = clone(doc);
+  try {
+    await db.doc("maps/" + id).set(body);
+    maps[id] = body;
+    setStatus("Saved for your team", "saved");
+  } catch (e) {
+    if (e && e.code === "invalid_argument") { canWrite = false; setStatus("View only — you can't save edits here", "warn"); }
+    else if (e && e.code === "quota_exceeded") setStatus("Storage is full — delete an old retainer map", "warn");
+    else setStatus("Couldn't save — will retry on your next edit", "warn");
+  }
+  saving = false;
+  if (queued) { queued = false; save(); } else dirty = false;
+}
+function undo() {
+  if (!undoStack.length) return;
+  doc = JSON.parse(undoStack.pop());
+  dirty = true; render(); scheduleSave();
+}
+
+/* ---------- online backend: Supabase (maps) + /api/notion (calendar) ---------- */
+const SUPABASE_URL = "https://nlggbvbzybabyhrwizfn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sZ2didmJ6eWJhYnlocndpemZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4MzQ0NTAsImV4cCI6MjEwOTQxMDQ1MH0.UcCNAbPtfyhnI8LiHwoZH0Zdh7ByLCvDsOofYlu0vJ4";
+function makeDb() {
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const fail = e => { const err = new Error(e.message || "error"); err.code = /quota|exceed/i.test(e.message || "") ? "quota_exceeded" : "db_error"; return err; };
+  return {
+    doc(path) {
+      const id = path.split("/")[1];
+      return {
+        async set(data) { const { error } = await sb.from("maps").upsert({ id, data, updated_at: new Date().toISOString() }); if (error) throw fail(error); },
+        async delete() { const { error } = await sb.from("maps").delete().eq("id", id); if (error) throw fail(error); }
+      };
+    },
+    collection() {
+      return {
+        onSnapshot(cb, onErr) {
+          let t = null;
+          const load = async () => {
+            const { data, error } = await sb.from("maps").select("id,data");
+            if (error) { onErr && onErr(error); return; }
+            cb({ metadata: { fromCache: false }, docs: data.map(r => ({ id: r.id, exists: true, data: () => r.data })) });
+          };
+          load();
+          sb.channel("maps-live").on("postgres_changes", { event: "*", schema: "public", table: "maps" }, () => { clearTimeout(t); t = setTimeout(load, 250); }).subscribe();
+          window.addEventListener("focus", load);
+        }
+      };
+    }
+  };
+}
+async function makeNotion() {
+  try {
+    const r = await fetch("/api/notion", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tool: "ping" }) });
+    const j = await r.json();
+    if (!j.ok) return null;
+  } catch (e) { return null; }
+  return {
+    async callTool(_server, tool, input) {
+      const r = await fetch("/api/notion", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tool, input }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.error) throw { code: j.code || "tool_error", message: j.error || ("HTTP " + r.status) };
+      return { payload: j.payload };
+    }
+  };
+}
+
+async function boot() {
+  doc = clone(DEFAULT);
+  render();
+  makeNotion().then(m => { mcp = m; if (mcp) { render(); if (isRetainer() && doc.systems.some(s => s.calPage)) pullFromNotion(false); } });
+  try { db = makeDb(); } catch (e) { db = null; }
+  if (!db) { setStatus("Couldn't load the database library — check your connection", "warn"); return; }
+  let gotLive = false;
+  const timer = setTimeout(() => { if (!gotLive) setStatus("Can't reach saved maps yet — showing the default", "warn"); }, 10000);
+  db.collection("maps").onSnapshot(snap => {
+    if (!snap.metadata.fromCache) { gotLive = true; clearTimeout(timer); }
+    maps = {};
+    snap.docs.forEach(d => { if (d.exists) maps[d.id] = d.data(); });
+    if (!maps[curId]) curId = maps.template ? "template" : (Object.keys(maps)[0] || "template");
+    const incoming = maps[curId];
+    if (incoming && !dirty && !saving && (!loaded || (incoming.rev || 0) !== (doc.rev || 0))) {
+      doc = clone(incoming); loaded = true; ui.pkg = isRetainer() ? doc.package : ui.pkg; render();
+    }
+    if (!incoming && gotLive) setStatus("No saved template yet — open Map settings to save it", "warn");
+    else if (gotLive && !dirty) setStatus(canWrite ? "Saved for your team" : "View only", canWrite ? "saved" : "warn");
+    renderMapSelect();
+  }, err => { clearTimeout(timer); setStatus("Saved maps unavailable — showing the default", "warn"); });
+}
+
+/* ---------- render ---------- */
+function render(opts = {}) {
+  renderMapSelect(); renderCtx(); renderStats(); renderMap(); renderLanes();
+  if (ui.drawer && !opts.keepDrawer) renderDrawer();
+  $("#undoBtn").disabled = !undoStack.length;
+}
+function renderMapSelect() {
+  const sel = $("#mapSel");
+  const key = id => { const m = maps[id] || {}; return ((m.client && m.client.name) || m.name || id) + "|" + (9999 - Number(String(m.month || "0000").slice(0, 4))) + "|" + (99 - Number(String(m.month || "00-00").slice(5, 7))); };
+  const ids = Object.keys(maps).sort((a, b) => a === "template" ? -1 : b === "template" ? 1 : key(a).localeCompare(key(b)));
+  if (!ids.includes(curId)) ids.unshift(curId);
+  sel.innerHTML = ids.map(id => {
+    const m = id === curId ? doc : maps[id];
+    const nm = id === "template" ? "Template (master)" : (m && m.name) || id;
+    return `<option value="${esc(id)}" ${id === curId ? "selected" : ""}>${esc(nm)}</option>`;
+  }).join("");
+}
+function renderCtx() {
+  const el = $("#ctx");
+  if (isRetainer()) {
+    const pk = doc.packages.find(p => p.id === doc.package);
+    const steps = doc.systems.filter(s => inPkg(s.id)).flatMap(sysSteps), d = doneCount(steps), n = steps.length || 1;
+    const dated = doc.systems.filter(s => inPkg(s.id) && s.date).length, total = doc.systems.filter(s => inPkg(s.id)).length;
+    el.innerHTML = `<h2>${esc(doc.name)}</h2><p>This month's plan for ${esc((doc.client && doc.client.name) || doc.name)}. Give each system a day and it goes on the Notion General Calendar with the people involved. Tick steps as you finish them.</p>
+      <span class="tag">${esc(monthLong(doc.month) || "No month set")} · ${esc(pk ? pk.name + " · " + pk.price : "No package")}</span>
+      <div class="prog"><div class="minibar"><i class="d" style="width:${d / n * 100}%"></i></div><small>${d} of ${steps.length} steps done · ${dated} of ${total} systems on the calendar</small></div>`;
+  } else {
+    el.innerHTML = `<h2>Master template</h2><p>Every system and step AG runs. Each client gets a monthly copy of it (for example ANS Roofing · November) where you set the days and tick off steps. Improve the template here first.</p>`;
+  }
+}
+function renderStats() {
+  const steps = doc.systems.filter(s => inPkg(s.id)).flatMap(sysSteps);
+  const c = counts(steps), total = steps.length || 1;
+  const stat = (m, n, lbl) => `<button type="button" class="stat ${m} ${ui.mode === m ? "on" : ""}" data-mode="${m}" aria-pressed="${ui.mode === m}"><b>${n}</b><span>${lbl}</span></button>`;
+  $("#stats").innerHTML =
+    `<div class="stat"><b>${steps.length}</b><span>Steps${ui.pkg ? " in " + esc((doc.packages.find(p => p.id === ui.pkg) || {}).name || "") : ""}</span></div>` +
+    stat("auto", c.auto, `Automated · ${Math.round(c.auto / total * 100)}%`) +
+    stat("hybrid", c.hybrid, `AI + human check`) +
+    stat("manual", c.manual, `Manual · ${Math.round(c.manual / total * 100)}%`);
+  $("#people").innerHTML = `<span class="lbl">Highlight owner:</span>` + doc.people.map(p =>
+    `<button type="button" class="pchip ${ui.owner === p.id ? "on" : ""}" data-owner="${esc(p.id)}" aria-pressed="${ui.owner === p.id}">${av(p.id)}${esc(p.name)} <span style="opacity:.6;font-weight:500">${steps.filter(s => s.owner === p.id).length}</span></button>`).join("") +
+    `<button type="button" class="btn" style="padding:3px 10px;font-size:13px" data-act="team">Edit team</button>`;
+}
+function renderMap() {
+  const map = $("#map");
+  map.innerHTML = `<div class="pkrow" style="grid-template-columns:repeat(${doc.packages.length},1fr)">` + doc.packages.map((p, i) => {
+    const dim = ui.pkg && ui.pkg !== p.id;
+    return `<div class="pk ${ui.pkg === p.id ? "on" : ""} ${dim ? "dim" : ""}" style="--pc:${pkColor(p, i)}" data-pkg="${esc(p.id)}">
+      <button type="button" class="edit" data-editpkg="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${pencil()}</button>
+      <button type="button" data-pkgsel="${esc(p.id)}" style="all:unset;cursor:pointer;display:block" aria-pressed="${ui.pkg === p.id}">
+        <h3>${esc(p.name)}</h3><div class="price">${esc(p.price)}</div><p>${esc(p.blurb)}</p>
+        <p style="margin-top:6px;font-weight:700;color:var(--ink)">${p.systems.length} system${p.systems.length === 1 ? "" : "s"}</p>
+      </button></div>`;
+  }).join("") + `</div><div class="sysrow" style="--n:${doc.systems.length}">` + doc.systems.map(s => {
+    const st = sysSteps(s), c = counts(st), n = st.length || 1;
+    return `<button type="button" class="sn ${inPkg(s.id) ? "" : "dim"}" data-sys="${esc(s.id)}">
+      <div class="code">SYSTEM ${esc(s.code)}</div><h3>${esc(s.name)}</h3>
+      ${bar(c, n)}<div class="meta">${isRetainer() ? `${doneCount(st)}/${st.length} done` : `${st.length} steps · ${Math.round(c.auto / n * 100)}% automated`}</div>
+      ${isRetainer() && s.date ? `<div class="date">${esc(prettyDate(s.date))}</div>` : ""}
+      <div class="dots">${doc.packages.map((p, i) => `<i style="${p.systems.includes(s.id) ? "background:" + pkColor(p, i) : ""}" title="${esc(p.name)}"></i>`).join("")}</div>
+    </button>`;
+  }).join("") + `</div><svg id="mapsvg" aria-hidden="true"><defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs></svg>`;
+  requestAnimationFrame(drawLines);
+}
+function bar(c, n) { return `<div class="minibar"><i class="a" style="width:${c.auto / n * 100}%"></i><i class="h" style="width:${c.hybrid / n * 100}%"></i><i class="m" style="width:${c.manual / n * 100}%"></i></div>`; }
+function drawLines() {
+  const map = $("#map"), svg = $("#mapsvg"); if (!map || !svg) return;
+  const box = map.getBoundingClientRect();
+  const R = el => { const r = el.getBoundingClientRect(); return { x: r.left - box.left, y: r.top - box.top, w: r.width, h: r.height }; };
+  let out = svg.querySelector("defs").outerHTML;
+  const npk = doc.packages.length;
+  doc.packages.forEach((p, pi) => {
+    const pe = map.querySelector(`[data-pkg="${CSS.escape(p.id)}"]`); if (!pe) return;
+    const a = R(pe), off = (pi - (npk - 1) / 2);
+    p.systems.forEach(sid => {
+      const se = map.querySelector(`[data-sys="${CSS.escape(sid)}"]`); if (!se) return;
+      const b = R(se);
+      const x1 = a.x + a.w / 2 + off * 22, y1 = a.y + a.h, x2 = b.x + b.w / 2 + off * 14, y2 = b.y;
+      const hot = ui.pkg === p.id || (ui.hoverSys === sid && !ui.pkg), dim = ui.pkg && ui.pkg !== p.id;
+      out += `<path class="lnk ${hot ? "hot" : ""} ${dim ? "dim" : ""}" stroke="${pkColor(p, pi)}" d="M${x1},${y1} C${x1},${y1 + 55} ${x2},${y2 - 55} ${x2},${y2}"/>`;
+      out += `<circle cx="${x2}" cy="${y2}" r="3.5" fill="${pkColor(p, pi)}" class="lnk ${hot ? "hot" : ""} ${dim ? "dim" : ""}"/>`;
+    });
+  });
+  (doc.flows || []).forEach(f => {
+    const ea = map.querySelector(`[data-sys="${CSS.escape(f.from)}"]`), eb = map.querySelector(`[data-sys="${CSS.escape(f.to)}"]`);
+    if (!ea || !eb) return;
+    const a = R(ea), b = R(eb), back = b.x < a.x;
+    const x1 = a.x + a.w / 2 + (back ? -10 : 10), x2 = b.x + b.w / 2 + (back ? 10 : -10), y = a.y + a.h;
+    const depth = 26 + Math.abs(x2 - x1) * 0.16 + (back ? 22 : 0);
+    const hot = ui.hoverSys && (ui.hoverSys === f.from || ui.hoverSys === f.to);
+    out += `<path class="flow ${hot ? "hot" : ""}" style="color:var(--${hot ? "ink" : "muted"})" marker-end="url(#arr)" d="M${x1},${y + 2} C${x1},${y + depth} ${x2},${y + depth} ${x2},${y + 4}"/>`;
+    out += `<text class="flowlbl ${hot ? "hot" : ""}" x="${(x1 + x2) / 2}" y="${y + depth * 0.75 + 4}" text-anchor="middle">${esc(f.label)}</text>`;
+  });
+  svg.innerHTML = out;
+}
+function pencil() { return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>`; }
+function bolt() { return `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>`; }
+function arrow() { return `<svg viewBox="0 0 34 12" aria-hidden="true"><path d="M2 6h26" stroke="currentColor" stroke-width="1.6"/><path d="M26 1.5L32 6l-6 4.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`; }
+
+function renderLanes() {
+  const el = $("#lanes");
+  el.innerHTML = doc.systems.map(sys => {
+    const st = sysSteps(sys), c = counts(st), n = st.length || 1, inside = inPkg(sys.id);
+    const pkname = ui.pkg ? (doc.packages.find(p => p.id === ui.pkg) || {}).name : "";
+    const collapsed = isRetainer() && !inside;
+    return `<section class="lane ${!inside && !collapsed ? "dim" : ""} ${collapsed ? "collapsed" : ""}" id="lane-${esc(sys.id)}" aria-label="System ${esc(sys.code)}">
+      <div class="lanehead">
+        <div class="syscode">${esc(sys.code)}</div>
+        <div class="lanetitle"><button type="button" data-editsys="${esc(sys.id)}" title="Edit system">${esc(sys.name)}</button><span>${esc(sys.short)}</span></div>
+        <span class="chip">${esc(sys.cadence)}</span>
+        <div class="pkdots">${doc.packages.map((p, i) => p.systems.includes(sys.id) ? `<span style="background:${pkColor(p, i)}">${esc(p.name)}</span>` : "").join("")}</div>
+        ${!inside ? `<span class="notin">Not in ${esc(pkname)}</span>` : ""}
+        ${isRetainer() && inside ? `<span class="donechip">${doneCount(st)}/${st.length} done</span>` : ""}
+        <div class="lanebar">${bar(c, n)}<small>${c.auto} auto · ${c.hybrid} AI+check · ${c.manual} manual</small></div>
+      </div>
+      ${isRetainer() && inside ? dateRow(sys) : ""}
+      ${sys.stages.map((stg, si) => `<div class="stage">
+        <div class="stagehead">${sys.stages.length > 1 ? `<span class="letter">${esc(sys.code + String.fromCharCode(65 + si))}</span>` : ""}<b>${esc(stg.name)}</b><span>${esc(stg.when)}</span></div>
+        <div class="track">${stg.steps.map((s, i) => (i ? `<div class="conn">${arrow()}</div>` : "") + card(sys, si, i, s)).join("")}
+          <button type="button" class="addcard" data-add="${esc(sys.id)}|${esc(stg.id)}">+ Add step</button></div>
+      </div>`).join("")}
+    </section>`;
+  }).join("") + `<button type="button" class="btn addsys" data-act="addsys">+ Add a system</button>`;
+}
+function dateRow(sys) {
+  const cs = calState[sys.id] || {};
+  let st;
+  if (cs.state === "syncing") st = `<span class="calst">Saving to the Notion calendar…</span>`;
+  else if (cs.state === "error") st = `<span class="calst err">${esc(cs.msg)} <button type="button" data-retry="${esc(sys.id)}">Retry</button></span>`;
+  else if (sys.calPage) {
+    const href = /^https?:/.test(sys.calPage) ? sys.calPage : "https://www.notion.so/" + sys.calPage.replace(/-/g, "");
+    st = `<span class="calst ok">${sys.date ? "On the General Calendar" : "Date cleared in calendar"} · <a href="${esc(href)}" target="_blank" rel="noopener">Open in Notion ↗</a></span>`;
+  } else st = `<span class="calst">${mcp ? "Pick a day to put it on the General Calendar" : "Pick a day (calendar sync needs Notion in this view)"}</span>`;
+  const people = sysPeople(sys).map(id => av(id)).join("");
+  return `<div class="lanehead" style="border-bottom:1px solid var(--line);padding-top:10px;padding-bottom:10px;background:var(--surface-2);border-radius:0">
+    <div class="datebox"><label for="d-${esc(sys.id)}">Day</label><input class="inp" type="date" id="d-${esc(sys.id)}" data-sysdate="${esc(sys.id)}" value="${esc(sys.date || "")}"></div>
+    ${st}
+    <span style="margin-left:auto;display:flex;gap:3px;align-items:center" title="People in this system">${people}</span>
+  </div>`;
+}
+function card(sys, si, i, s) {
+  const p = person(s.owner);
+  const dim = (ui.owner && s.owner !== ui.owner) || (ui.mode && s.mode !== ui.mode);
+  const cross = (s.feeds || []).map(fid => locate(fid)).filter(l => l && l.sys.id !== sys.id).map(l => "S" + l.sys.code);
+  const uniq = [...new Set(cross)];
+  const toolLine = s.mode !== "manual" && s.tool ? `<div class="tool">${bolt()}<span>${esc(s.tool)}</span></div>` : "";
+  const ownLine = `<div class="own">${av(s.owner)}<span>${s.mode === "auto" ? "Watched by " : ""}${esc(p.name)}</span></div>`;
+  const ret = isRetainer(), done = ret && s.done;
+  const check = ret ? `<button type="button" class="check ${done ? "on" : ""}" data-done="${esc(s.id)}" aria-pressed="${!!done}" aria-label="${done ? "Mark not done" : "Mark done"}: ${esc(s.title)}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>` : "";
+  return `<div class="cardwrap ${ret ? "has-check" : ""}"><button type="button" class="card ${s.mode} ${done ? "done" : ""} ${ui.drawer && ui.drawer.type === "step" && ui.drawer.id === s.id ? "sel" : ""} ${dim ? "dim" : ""}" data-step="${esc(s.id)}" aria-label="${esc(label(sys, si, i) + " " + s.title + ", " + MODES[s.mode] + (done ? ", done" : ""))}">
+    <div class="row1"><span class="num">${label(sys, si, i)}</span><span class="mpill ${s.mode}">${s.mode === "auto" ? "Auto" : s.mode === "hybrid" ? "AI + check" : "Manual"}</span></div>
+    <div class="t">${esc(s.title)}</div>
+    <div class="who">${toolLine}${ownLine}${uniq.length ? `<span class="feedtag">→ feeds ${uniq.join(", ")}</span>` : ""}</div>
+  </button>${check}</div>`;
+}
+
+/* ---------- drawer ---------- */
+function openDrawer(d) { ui.drawer = d; ui.armed = null; renderDrawer(); $("#drawer").classList.add("on"); $("#drawer").setAttribute("aria-hidden", "false"); $("#scrim").classList.add("on"); renderLanes(); }
+function closeDrawer() { ui.drawer = null; $("#drawer").classList.remove("on"); $("#drawer").setAttribute("aria-hidden", "true"); $("#scrim").classList.remove("on"); renderLanes(); }
+function renderDrawer() {
+  const d = ui.drawer, el = $("#drawer"); if (!d) return;
+  if (el.contains(document.activeElement) && document.activeElement.matches("input,textarea") && !d.force) return;
+  d.force = false;
+  const tools = new Set(BASE_TOOLS); doc.systems.forEach(s => sysSteps(s).forEach(st => st.tool && tools.add(st.tool)));
+  $("#toolList").innerHTML = [...tools].map(t => `<option value="${esc(t)}">`).join("");
+  let html = "";
+  if (d.type === "step") html = stepDrawer(d.id);
+  else if (d.type === "sys") html = sysDrawer(d.id);
+  else if (d.type === "pkg") html = pkgDrawer(d.id);
+  else if (d.type === "team") html = teamDrawer();
+  else if (d.type === "newmap") html = newMapDrawer();
+  else if (d.type === "settings") html = settingsDrawer();
+  if (!html) { closeDrawer(); return; }
+  el.innerHTML = html;
+}
+function head(small, title) { return `<div class="dhead"><div><small>${esc(small)}</small><h2>${esc(title)}</h2></div><button type="button" class="x" data-act="close" aria-label="Close">×</button></div>`; }
+function armBtn(key, text, armedText) { return `<button type="button" class="btn danger ${ui.armed === key ? "armed" : ""}" data-arm="${esc(key)}">${ui.armed === key ? armedText : text}</button>`; }
+
+function stepDrawer(id) {
+  const l = locate(id); if (!l) return "";
+  const s = l.step, lab = label(l.sys, l.si, l.idx);
+  const all = doc.systems.map(sys => `<optgroup label="System ${esc(sys.code)} · ${esc(sys.name)}">` + sys.stages.map((stg, si) => stg.steps.map((x, i) => x.id === id || (s.feeds || []).includes(x.id) ? "" : `<option value="${esc(x.id)}">${esc(label(sys, si, i) + " " + x.title)}</option>`).join("")).join("") + `</optgroup>`).join("");
+  const into = doc.systems.flatMap(sys => sysSteps(sys)).filter(x => (x.feeds || []).includes(id));
+  const runTarget = isRetainer() ? doc.name : null;
+  return head(`STEP ${lab} · SYSTEM ${l.sys.code} · ${l.stage.name.toUpperCase()}`, s.title) + `<div class="dbody">
+    <div class="field"><label for="f-title">Step name</label><input class="inp" id="f-title" data-f="title" value="${esc(s.title)}"></div>
+    <div class="field"><label for="f-short">Short summary (shown on hover)</label><input class="inp" id="f-short" data-f="short" value="${esc(s.short)}"></div>
+    <div class="field"><span class="lab">How it runs</span><div class="seg" role="radiogroup" aria-label="How it runs">
+      ${["auto", "hybrid", "manual"].map(m => `<button type="button" role="radio" aria-checked="${s.mode === m}" class="${m} ${s.mode === m ? "on" : ""}" data-mode-set="${m}"><i style="background:${m === "hybrid" ? "linear-gradient(90deg,var(--auto) 50%,var(--manual) 50%)" : `var(--${m})`}"></i>${m === "auto" ? "Automated" : m === "hybrid" ? "AI + check" : "Manual"}</button>`).join("")}
+    </div></div>
+    <div class="two">
+      <div class="field"><label for="f-owner">${s.mode === "auto" ? "Watched by" : "Owner"}</label><select class="inp" id="f-owner" data-f="owner">
+        ${doc.people.map(p => `<option value="${esc(p.id)}" ${p.id === s.owner ? "selected" : ""}>${esc(p.name)}</option>`).join("")}<option value="__new">+ Add a person…</option></select></div>
+      <div class="field"><label for="f-tool">Tool / AI ${s.mode === "manual" ? "(optional)" : ""}</label><input class="inp" id="f-tool" list="toolList" data-f="tool" value="${esc(s.tool)}" placeholder="e.g. Claude scheduled task"></div>
+    </div>
+    <div class="field"><label for="f-when">When / trigger</label><input class="inp" id="f-when" data-f="when" value="${esc(s.when)}" placeholder="e.g. Every Monday, or On status: Shot"></div>
+    <div class="field"><label for="f-detail">Full description</label><textarea class="inp" id="f-detail" data-f="detail">${esc(s.detail)}</textarea></div>
+    <div class="field"><span class="lab">Feeds into</span><div class="feeds">
+      ${(s.feeds || []).map(fid => { const fl = locate(fid); return fl ? `<span class="feed"><button type="button" class="go" data-goto="${esc(fid)}">${esc(label(fl.sys, fl.si, fl.idx))} ${esc(fl.step.title)}</button><button type="button" data-unfeed="${esc(fid)}" aria-label="Remove link">×</button></span>` : ""; }).join("") || `<span class="note">Nothing linked. The next step in the lane follows automatically.</span>`}
+    </div><select class="inp" id="f-feed" aria-label="Link to another step"><option value="">+ Link to another step…</option>${all}</select></div>
+    ${into.length ? `<div class="field"><span class="lab">Fed by</span><div class="feeds">${into.map(x => `<span class="feed" style="padding-right:10px"><button type="button" class="go" data-goto="${esc(x.id)}">${esc(labelOf(x.id))} ${esc(x.title)}</button></span>`).join("")}</div></div>` : ""}
+    ${s.mode !== "manual" ? `<div class="runbox"><button type="button" class="btn" disabled>▶ Run${runTarget ? " for " + esc(runTarget) : ""}</button><p>${runTarget ? "Coming next: this button will run the step for this retainer." : "Coming next: open a retainer map to run this step for that client."}</p></div>` : ""}
+    ${isRetainer() ? `<button type="button" class="btn ${s.done ? "" : "primary"}" data-done="${esc(s.id)}" style="align-self:flex-start">${s.done ? "✓ Done — mark not done" : "Mark done for " + esc(monthLong(doc.month) || "this month")}</button>` : ""}
+    <div class="actions">
+      <button type="button" class="btn" data-act="left">← Move</button>
+      <button type="button" class="btn" data-act="right">Move →</button>
+      <button type="button" class="btn" data-act="insert">+ Step after</button>
+      <button type="button" class="btn" data-act="dup">Duplicate</button>
+      ${armBtn("delstep", "Delete", "Click again to delete")}
+    </div></div>`;
+}
+function sysDrawer(id) {
+  const sys = doc.systems.find(s => s.id === id); if (!sys) return "";
+  return head(`SYSTEM ${sys.code}`, sys.name) + `<div class="dbody">
+    <div class="two"><div class="field"><label for="y-code">Number</label><input class="inp" id="y-code" data-y="code" value="${esc(sys.code)}"></div>
+    <div class="field"><label for="y-cad">Cadence</label><input class="inp" id="y-cad" data-y="cadence" value="${esc(sys.cadence)}"></div></div>
+    <div class="field"><label for="y-name">System name</label><input class="inp" id="y-name" data-y="name" value="${esc(sys.name)}"></div>
+    <div class="field"><label for="y-short">What it does</label><input class="inp" id="y-short" data-y="short" value="${esc(sys.short)}"></div>
+    <div class="field"><span class="lab">Included in packages</span><div class="checks">${doc.packages.map(p => `<label><input type="checkbox" data-sp="${esc(p.id)}" ${p.systems.includes(id) ? "checked" : ""}> ${esc(p.name)} <span class="note">${esc(p.price)}</span></label>`).join("")}</div></div>
+    <div class="field"><span class="lab">Stages (name · when)</span>${sys.stages.map(st => `<div class="stagerow"><input class="inp" aria-label="Stage name" data-stg="${esc(st.id)}|name" value="${esc(st.name)}"><input class="inp" aria-label="Stage timing" data-stg="${esc(st.id)}|when" value="${esc(st.when)}">${sys.stages.length > 1 ? armBtn("delstage:" + st.id, "×", "Delete " + st.steps.length + " steps?") : "<span></span>"}</div>`).join("")}
+      <button type="button" class="btn" data-act="addstage" style="align-self:flex-start">+ Add stage</button></div>
+    <div class="actions">${armBtn("delsys", "Delete system", "Click again: delete " + sysSteps(sys).length + " steps")}</div></div>`;
+}
+function pkgDrawer(id) {
+  const p = doc.packages.find(x => x.id === id); if (!p) return "";
+  return head("PACKAGE", p.name) + `<div class="dbody">
+    <div class="two"><div class="field"><label for="k-name">Name</label><input class="inp" id="k-name" data-k="name" value="${esc(p.name)}"></div>
+    <div class="field"><label for="k-price">Price</label><input class="inp" id="k-price" data-k="price" value="${esc(p.price)}"></div></div>
+    <div class="field"><label for="k-blurb">What's included</label><textarea class="inp" id="k-blurb" data-k="blurb" style="min-height:80px">${esc(p.blurb)}</textarea></div>
+    <div class="field"><span class="lab">Systems in this package</span><div class="checks">${doc.systems.map(s => `<label><input type="checkbox" data-ps="${esc(s.id)}" ${p.systems.includes(s.id) ? "checked" : ""}> ${esc(s.code)} · ${esc(s.name)}</label>`).join("")}</div></div></div>`;
+}
+function teamDrawer() {
+  return head("TEAM", "People and roles") + `<div class="dbody"><p class="note">Owners you can assign to steps. Removing someone moves their steps to Unassigned.</p>
+    ${doc.people.map(p => `<div class="stagerow">${""}<input class="inp" aria-label="Name" data-pp="${esc(p.id)}|name" value="${esc(p.name)}"><input class="inp" aria-label="Role" data-pp="${esc(p.id)}|role" value="${esc(p.role)}">${armBtn("delperson:" + p.id, "×", "Remove?")}</div>`).join("")}
+    <button type="button" class="btn" data-act="addperson" style="align-self:flex-start">+ Add person</button></div>`;
+}
+function newMapDrawer() {
+  const pf = ui.drawer.prefill || {};
+  if (mcp && !customers) loadCustomers();
+  const pkgs = (maps.template || doc).packages;
+  const custSel = customers && customers.length
+    ? `<select class="inp" id="n-cust"><option value="">Choose a client…</option>${customers.map((c, i) => `<option value="${i}" ${pf.client && pf.client.url === c.url ? "selected" : ""}>${esc(c.name)}${c.tier ? " · " + esc(c.tier) : ""}</option>`).join("")}<option value="__other">Other (type a name)</option></select>`
+    : `<p class="note">${mcp ? (customers ? esc(custErr || "No retainer clients found in Notion.") : "Loading clients from Notion…") : "Notion isn't available here, so type the client's name."}</p>`;
+  const sources = Object.keys(maps).filter(id => id !== "template" && maps[id].kind === "retainer");
+  return head("NEW MONTHLY MAP", pf.client ? "Next month for " + pf.client.name : "Plan a client's month") + `<div class="dbody">
+    <p class="note">Creates one client's plan for one month, for example "ANS ROOFING · November 2026". Then give each system a day and it lands on the Notion General Calendar.</p>
+    <div class="field"><span class="lab">Client (from Notion Customers)</span>${custSel}
+      <input class="inp" id="n-name" placeholder="Client name" value="${esc(pf.client ? pf.client.name : "")}" ${customers && customers.length && !pf.other ? 'style="display:none"' : ""}></div>
+    <div class="two">
+      <div class="field"><label for="n-month">Month</label><input class="inp" type="month" id="n-month" value="${esc(pf.month || addMonth(thisMonth(), new Date().getDate() > 15 ? 1 : 0))}"></div>
+      <div class="field"><label for="n-short">Calendar name</label><input class="inp" id="n-short" value="${esc(pf.short || "")}" placeholder="e.g. ANS"></div>
+    </div>
+    <div class="two">
+      <div class="field"><label for="n-pkg">Package</label><select class="inp" id="n-pkg">${pkgs.map(p => `<option value="${esc(p.id)}" ${pf.package === p.id ? "selected" : ""}>${esc(p.name)} · ${esc(p.price)}</option>`).join("")}</select></div>
+      <div class="field"><label for="n-src">Start from</label><select class="inp" id="n-src"><option value="template">Master template</option>${sources.map(id => `<option value="${esc(id)}" ${pf.source === id ? "selected" : ""}>${esc(maps[id].name)}</option>`).join("")}</select></div>
+    </div>
+    <p class="note">"Start from" a past month keeps that client's own edits. Days and checkmarks always start fresh.</p>
+    <div class="actions"><button type="button" class="btn primary" data-act="createmap" ${!db || !canWrite ? "disabled" : ""}>Create monthly map</button>${!db ? `<span class="note">Saving isn't available in this view.</span>` : ""}</div></div>`;
+}
+function settingsDrawer() {
+  const r = isRetainer();
+  return head("MAP SETTINGS", r ? doc.name : "Master template") + `<div class="dbody">
+    ${r ? `<div class="field"><label for="m-name">Map name</label><input class="inp" id="m-name" data-m="name" value="${esc(doc.name)}"></div>
+    <div class="two"><div class="field"><label for="m-month">Month</label><input class="inp" type="month" id="m-month" data-m="month" value="${esc(doc.month || "")}"></div>
+    <div class="field"><label for="m-short">Calendar name</label><input class="inp" id="m-short" data-m="short" value="${esc(doc.short || "")}"></div></div>
+    <div class="field"><label for="m-pkg">Package</label><select class="inp" id="m-pkg" data-m="package">${doc.packages.map(p => `<option value="${esc(p.id)}" ${p.id === doc.package ? "selected" : ""}>${esc(p.name)} · ${esc(p.price)}</option>`).join("")}</select></div>
+    <p class="note">Calendar entries are named like "${esc(calTitle(doc.systems[0] || { code: "1", name: "Content & strategy" }))}". If you move a day in the Notion General Calendar, use "Pull dates" to bring it back here.</p>
+    <div class="actions">
+      <button type="button" class="btn primary" data-act="nextmonth">Start next month's map</button>
+      <button type="button" class="btn" data-act="pull">Pull dates from Notion</button>
+    </div>
+    <div class="actions">${armBtn("delmap", "Delete this monthly map", "Click again to delete")}<span class="note">Calendar pages in Notion stay.</span></div>`
+    : `<p class="note">The template is the master copy. Retainer maps are copies, so template changes don't change existing retainers.</p>
+    <div class="actions">${maps.template ? "" : `<button type="button" class="btn primary" data-act="savetpl" ${!db || !canWrite ? "disabled" : ""}>Save template for the team</button>`}
+    ${armBtn("resettpl", "Reset template to recommended", "Click again: replace all edits")}</div>`}</div>`;
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button, [data-pkgsel]"); if (!t) return;
+  if (t.dataset.done) { const id = t.dataset.done; const l = locate(id); if (!l) return; edit(() => { l.step.done = !l.step.done; }, { keepDrawer: !(ui.drawer && ui.drawer.id === id) }); queueStatusSync(l.sys.id); return; }
+  if (t.dataset.retry) { syncSystem(t.dataset.retry); return; }
+  if (t.matches("[data-step]")) { hideTip(); openDrawer({ type: "step", id: t.dataset.step }); return; }
+  if (t.dataset.add) { const [sid, stid] = t.dataset.add.split("|"); addStep(sid, stid, -1); return; }
+  if (t.dataset.editsys) { openDrawer({ type: "sys", id: t.dataset.editsys }); return; }
+  if (t.dataset.editpkg) { openDrawer({ type: "pkg", id: t.dataset.editpkg }); return; }
+  if (t.dataset.pkgsel) { if (isRetainer()) return; ui.pkg = ui.pkg === t.dataset.pkgsel ? null : t.dataset.pkgsel; render({ keepDrawer: true }); return; }
+  if (t.dataset.sys) { const lane = document.getElementById("lane-" + t.dataset.sys); lane && lane.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }); return; }
+  if (t.dataset.mode) { ui.mode = ui.mode === t.dataset.mode ? null : t.dataset.mode; renderStats(); renderLanes(); return; }
+  if (t.dataset.owner) { ui.owner = ui.owner === t.dataset.owner ? null : t.dataset.owner; renderStats(); renderLanes(); return; }
+  if (t.dataset.goto) { openDrawer({ type: "step", id: t.dataset.goto }); const c = document.querySelector(`[data-step="${CSS.escape(t.dataset.goto)}"]`); c && c.scrollIntoView({ block: "center", inline: "center" }); return; }
+  if (t.dataset.unfeed) { const id = ui.drawer.id; edit(d => { const s = locate(id).step; s.feeds = s.feeds.filter(f => f !== t.dataset.unfeed); }); return; }
+  if (t.dataset.modeSet) { const id = ui.drawer.id; edit(d => { locate(id).step.mode = t.dataset.modeSet; }); return; }
+  if (t.dataset.arm) { if (ui.armed !== t.dataset.arm) { ui.armed = t.dataset.arm; renderDrawer(); return; } doArmed(t.dataset.arm); return; }
+  const act = t.dataset.act; if (!act) return;
+  if (act === "close") closeDrawer();
+  else if (act === "team") openDrawer({ type: "team" });
+  else if (act === "addsys") addSystem();
+  else if (act === "left" || act === "right") moveStep(ui.drawer.id, act === "left" ? -1 : 1);
+  else if (act === "insert") { const l = locate(ui.drawer.id); addStep(l.sys.id, l.stage.id, l.idx + 1); }
+  else if (act === "dup") { const l = locate(ui.drawer.id); const c = clone(l.step); c.id = rid("st"); c.title += " (copy)"; edit(() => l.stage.steps.splice(l.idx + 1, 0, c)); openDrawer({ type: "step", id: c.id }); }
+  else if (act === "addstage") { const id = ui.drawer.id; edit(d => d.systems.find(s => s.id === id).stages.push({ id: rid("stg"), name: "New stage", when: "", steps: [] })); }
+  else if (act === "addperson") edit(d => d.people.push({ id: rid("p"), name: "New person", role: "" }));
+  else if (act === "createmap") createMap();
+  else if (act === "pull") pullFromNotion(true);
+  else if (act === "nextmonth") openDrawer({ type: "newmap", prefill: { client: doc.client || { name: (doc.name || "").split(" · ")[0] }, other: !(doc.client && doc.client.url), short: doc.short, package: doc.package, month: addMonth(doc.month || thisMonth(), 1), source: curId } });
+  else if (act === "savetpl") { curId = "template"; dirty = true; save(); closeDrawer(); }
+});
+function doArmed(key) {
+  ui.armed = null;
+  if (key === "delstep") { const id = ui.drawer.id; closeDrawer(); edit(d => { const l = locate(id); l.stage.steps.splice(l.idx, 1); d.systems.forEach(s => sysSteps(s).forEach(x => x.feeds = (x.feeds || []).filter(f => f !== id))); }); }
+  else if (key === "delsys") { const id = ui.drawer.id; closeDrawer(); edit(d => { d.systems = d.systems.filter(s => s.id !== id); d.packages.forEach(p => p.systems = p.systems.filter(x => x !== id)); d.flows = (d.flows || []).filter(f => f.from !== id && f.to !== id); }); }
+  else if (key.startsWith("delstage:")) { const stid = key.slice(9), id = ui.drawer.id; edit(d => { const s = d.systems.find(s => s.id === id); s.stages = s.stages.filter(x => x.id !== stid); }); }
+  else if (key.startsWith("delperson:")) { const pid = key.slice(10); edit(d => { d.people = d.people.filter(p => p.id !== pid); d.systems.forEach(s => sysSteps(s).forEach(x => { if (x.owner === pid) x.owner = ""; })); }); }
+  else if (key === "delmap") deleteMap();
+  else if (key === "resettpl") { edit(d => { const keep = { name: d.name, kind: d.kind, package: d.package, rev: d.rev }; Object.keys(d).forEach(k => delete d[k]); Object.assign(d, clone(DEFAULT), keep); }); closeDrawer(); }
+}
+document.addEventListener("input", e => {
+  const t = e.target, d = ui.drawer; if (!d) return;
+  if (t.dataset.f && t.tagName !== "SELECT") { const id = d.id; edit(() => { locate(id).step[t.dataset.f] = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.y) { const id = d.id; edit(dd => { dd.systems.find(s => s.id === id)[t.dataset.y] = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.k) { const id = d.id; edit(dd => { dd.packages.find(p => p.id === id)[t.dataset.k] = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.stg) { const [stid, f] = t.dataset.stg.split("|"), id = d.id; edit(dd => { dd.systems.find(s => s.id === id).stages.find(x => x.id === stid)[f] = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.pp) { const [pid, f] = t.dataset.pp.split("|"); edit(dd => { dd.people.find(p => p.id === pid)[f] = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.m === "name") { edit(dd => { dd.name = t.value; }, { keepDrawer: true, noUndo: coalesce(t) }); }
+  else if (t.dataset.m === "short") { edit(dd => { dd.short = t.value.toUpperCase(); }, { keepDrawer: true, noUndo: coalesce(t) }); }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.sysdate) {
+    const id = t.dataset.sysdate, v = t.value || "";
+    edit(d => { const s = d.systems.find(x => x.id === id); if (s) s.date = v; }, { keepDrawer: true });
+    syncSystem(id);
+  } else if (t.id === "n-cust") {
+    const nm = $("#n-name"), sh = $("#n-short"), pk = $("#n-pkg");
+    if (t.value === "__other") { nm.style.display = ""; nm.value = ""; nm.focus(); return; }
+    nm.style.display = "none";
+    const c = customers[+t.value]; if (!c) return;
+    nm.value = c.name; if (!sh.value) sh.value = shortName(c.name);
+    const tier = (c.tier || "").toLowerCase(); if ([...pk.options].some(o => o.value === tier)) pk.value = tier;
+    const prev = Object.keys(maps).filter(id => maps[id].client && maps[id].client.url === c.url).sort((a, b) => String(maps[b].month).localeCompare(String(maps[a].month)))[0];
+    if (prev) $("#n-src").value = prev;
+  } else if (t.id === "n-name" && !$("#n-short").value) { $("#n-short").value = shortName(t.value); }
+});
+let lastField = null;
+function coalesce(t) { const same = lastField === t; lastField = t; return same; }
+document.addEventListener("change", e => {
+  const t = e.target, d = ui.drawer; if (!d) return;
+  if (t.id === "f-owner") {
+    const id = d.id;
+    if (t.value === "__new") { edit(dd => { const p = { id: rid("p"), name: "New person", role: "" }; dd.people.push(p); locate(id).step.owner = p.id; }); openDrawer({ type: "team" }); }
+    else edit(() => { locate(id).step.owner = t.value; }, { keepDrawer: true });
+    d.force = true; renderDrawer();
+  } else if (t.id === "f-feed" && t.value) { const id = d.id, v = t.value; edit(() => { const s = locate(id).step; s.feeds = [...(s.feeds || []), v]; }); }
+  else if (t.dataset.sp) { const pid = t.dataset.sp, id = d.id, on = t.checked; edit(dd => { const p = dd.packages.find(p => p.id === pid); p.systems = on ? [...new Set([...p.systems, id])] : p.systems.filter(x => x !== id); }, { keepDrawer: true }); }
+  else if (t.dataset.ps) { const sid = t.dataset.ps, id = d.id, on = t.checked; edit(dd => { const p = dd.packages.find(p => p.id === id); p.systems = on ? dd.systems.map(s => s.id).filter(x => x === sid || p.systems.includes(x)) : p.systems.filter(x => x !== sid); }, { keepDrawer: true }); }
+  else if (t.dataset.m === "package") { edit(dd => { dd.package = t.value; }); ui.pkg = t.value; render(); }
+  else if (t.dataset.m === "month") { edit(dd => { dd.month = t.value; }, { keepDrawer: true }); }
+});
+document.addEventListener("focusout", e => { if (e.target.matches && e.target.matches("#drawer input, #drawer textarea")) { lastField = null; setTimeout(() => { if (ui.drawer && !$("#drawer").contains(document.activeElement)) { ui.drawer.force = true; renderDrawer(); } }, 0); } });
+$("#scrim").addEventListener("click", closeDrawer);
+$("#undoBtn").addEventListener("click", undo);
+$("#newMap").addEventListener("click", () => openDrawer({ type: "newmap" }));
+$("#mapSettings").addEventListener("click", () => openDrawer({ type: "settings" }));
+$("#mapSel").addEventListener("change", e => switchMap(e.target.value));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && ui.drawer) closeDrawer();
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.target.matches("input,textarea")) { e.preventDefault(); undo(); }
+});
+
+/* hover: short info */
+const canHover = matchMedia("(hover: hover)").matches;
+document.addEventListener("mouseover", e => {
+  const c = e.target.closest("[data-step]"), sn = e.target.closest("[data-sys]");
+  if (sn && ui.hoverSys !== sn.dataset.sys) { ui.hoverSys = sn.dataset.sys; drawLines(); }
+  if (!sn && ui.hoverSys && !e.target.closest("#map")) { ui.hoverSys = null; drawLines(); }
+  if (!canHover) return;
+  if (c) showTip(c); else hideTip();
+});
+document.getElementById("map").addEventListener("mouseleave", () => { ui.hoverSys = null; drawLines(); });
+function showTip(c) {
+  const l = locate(c.dataset.step); if (!l) return;
+  const s = l.step, tip = $("#tip");
+  tip.innerHTML = `<b>${esc(s.title)}</b>${esc(s.short || "No summary yet.")}<small>${esc(MODES[s.mode])}${s.when ? " · " + esc(s.when) : ""} · click for details</small>`;
+  const r = c.getBoundingClientRect();
+  let x = r.left, y = r.bottom + 8;
+  tip.classList.add("on");
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  if (x + tw > innerWidth - 12) x = innerWidth - tw - 12;
+  if (y + th > innerHeight - 12) y = r.top - th - 8;
+  tip.style.left = Math.max(12, x) + "px"; tip.style.top = y + "px";
+}
+function hideTip() { $("#tip").classList.remove("on"); }
+addEventListener("scroll", hideTip, { passive: true });
+new ResizeObserver(() => drawLines()).observe(document.getElementById("map"));
+
+/* ---------- mutations ---------- */
+function addStep(sid, stid, at) {
+  const st = { id: rid("st"), title: "New step", short: "", detail: "", mode: "manual", owner: doc.people[0] ? doc.people[0].id : "", tool: "", when: "", feeds: [] };
+  edit(d => { const stage = d.systems.find(s => s.id === sid).stages.find(x => x.id === stid); if (at < 0) stage.steps.push(st); else stage.steps.splice(at, 0, st); });
+  openDrawer({ type: "step", id: st.id });
+  setTimeout(() => { const f = $("#f-title"); if (f) { f.focus(); f.select(); } }, 230);
+}
+function moveStep(id, dir) {
+  edit(() => {
+    const l = locate(id), steps = l.stage.steps, j = l.idx + dir;
+    if (j >= 0 && j < steps.length) { [steps[l.idx], steps[j]] = [steps[j], steps[l.idx]]; return; }
+    const nsi = l.si + dir; if (nsi < 0 || nsi >= l.sys.stages.length) return;
+    steps.splice(l.idx, 1);
+    const ns = l.sys.stages[nsi].steps; dir < 0 ? ns.push(l.step) : ns.unshift(l.step);
+  });
+}
+function addSystem() {
+  const n = String(Math.max(0, ...doc.systems.map(s => parseInt(s.code, 10) || 0)) + 1);
+  const sys = { id: rid("sys"), code: n, name: "New system", short: "What this system does", cadence: "Monthly", stages: [{ id: rid("stg"), name: "Main flow", when: "", steps: [] }] };
+  edit(d => d.systems.push(sys));
+  openDrawer({ type: "sys", id: sys.id });
+}
+function switchMap(id) {
+  if (dirty) { clearTimeout(saveTimer); save(); }
+  curId = id; undoStack = [];
+  doc = clone(maps[id] || DEFAULT); loaded = true;
+  ui.pkg = isRetainer() ? doc.package : null; ui.owner = null; ui.mode = null;
+  closeDrawer(); render(); scrollTo({ top: 0 });
+  if (isRetainer() && mcp && doc.systems.some(s => s.calPage)) pullFromNotion(false);
+}
+async function createMap() {
+  const sel = $("#n-cust"), pf = (ui.drawer && ui.drawer.prefill) || {};
+  let client = null;
+  if (sel && sel.value !== "" && sel.value !== "__other") { const c = customers[+sel.value]; client = { name: c.name, url: c.url }; }
+  const typed = ($("#n-name").value || "").trim();
+  if (!client && typed) client = (pf.client && pf.client.name === typed && pf.client.url) ? pf.client : { name: typed, url: "" };
+  if (!client) { const nm = $("#n-name"); nm.style.display = ""; nm.focus(); nm.placeholder = "Choose or type the client first"; return; }
+  const month = $("#n-month").value || thisMonth(), pkg = $("#n-pkg").value, src = $("#n-src").value;
+  const short = ($("#n-short").value || shortName(client.name)).toUpperCase();
+  const name = `${client.name} · ${monthLong(month)}`;
+  const dup = Object.keys(maps).find(id => maps[id].kind === "retainer" && maps[id].month === month && maps[id].client && maps[id].client.name === client.name);
+  if (dup) { setStatus(`${name} already exists — opened it`, "warn"); switchMap(dup); return; }
+  const base = clone(maps[src] || maps.template || (curId === "template" ? doc : DEFAULT));
+  base.systems.forEach(s => { s.date = ""; delete s.calPage; delete s.calStatus; sysSteps(s).forEach(x => { x.done = false; }); });
+  const id = (shortName(client.name).toLowerCase() || "retainer") + "-" + month + "-" + Math.random().toString(36).slice(2, 6);
+  Object.assign(base, { name, kind: "retainer", package: pkg, client, short, month, rev: 1, createdAt: Date.now() });
+  setStatus("Creating…", "saving");
+  try { await db.doc("maps/" + id).set(base); maps[id] = base; switchMap(id); setStatus("Saved for your team", "saved"); }
+  catch (e) { setStatus(e && e.code === "quota_exceeded" ? "Storage is full — delete an old map" : "Couldn't create the map — try again", "warn"); }
+}
+async function deleteMap() {
+  const id = curId; if (id === "template") return;
+  try { await db.doc("maps/" + id).delete(); delete maps[id]; switchMap("template"); }
+  catch (e) { setStatus("Couldn't delete — try again", "warn"); }
+}
+
+boot();
+</script>
+</body>
+</html>
